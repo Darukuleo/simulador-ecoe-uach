@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from google import genai
 
 class StandardizedPatientAgent:
@@ -7,9 +8,10 @@ class StandardizedPatientAgent:
     Agente Paciente Simulado Estandarizado (ECOE/OSCE).
     Responde en primera persona al interno de medicina de forma clínicamente coherente y realista.
     """
-    def __init__(self, api_key=None, model_name="gemini-flash-latest"):
-        self.client = genai.Client(api_key=api_key or os.environ.get("GEMINI_API_KEY"))
-        self.model_name = model_name
+    def __init__(self, api_key=None):
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=self.api_key)
+        self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
 
     def respond_to_student(self, ground_truth: dict, chat_history: list, user_message: str) -> str:
         prompt = f"""
@@ -40,11 +42,18 @@ class StandardizedPatientAgent:
         Responde como el paciente:
         """
         
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception as e:
-            return f"Doctor(a), me siento mal por mi dolencia. (Error de IA: {str(e)})"
+        last_error = ""
+        for model in self.fallback_models:
+            for attempt in range(2):
+                try:
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=prompt
+                    )
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as e:
+                    last_error = str(e)
+                    time.sleep(0.5)
+                    
+        return f"Doctor(a), me siento muy mal por mi dolor. Disculpe, ¿me podría repetir lo que dijo? (Reintento automático por congestión de servidor)."
