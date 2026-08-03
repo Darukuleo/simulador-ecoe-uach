@@ -1,0 +1,608 @@
+import streamlit as st
+import streamlit.components.v1 as components
+import os
+import sys
+import json
+import time
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
+from database import init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, get_evaluaciones_por_alumno, get_todas_evaluaciones
+from agents.patient_agent import StandardizedPatientAgent
+from agents.evaluator_agent import OSCEEvaluatorAgent
+
+st.set_page_config(page_title="Examen ECOE Virtual - UACh", page_icon="🏥", layout="wide")
+
+LOGO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "logo_uach.png"))
+
+# CLAVE DE ACCESO DOCENTE
+DOCENTE_PIN = os.environ.get("DOCENTE_PIN", "uach2026")
+
+# DISEÑO EXPERTO EN DOCENCIA MÉDICA: Alta legibilidad (WCAG AAA), Tono Cálido Crema/Lino Médico
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #F4F1EA !important;
+        color: #0F172A !important;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    }
+    
+    p, span, label, div, h1, h2, h3, h4, h5, h6, li {
+        color: #0F172A !important;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #EAE5D9 !important;
+        border-right: 2px solid #D6CEBE !important;
+    }
+    
+    div[data-testid="stRadio"] label {
+        color: #0F172A !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        background-color: #E2DCCF !important;
+        padding: 8px 12px !important;
+        border-radius: 8px !important;
+        border: 1px solid #C4BAA9 !important;
+    }
+    
+    h1, h2, h3, h4 {
+        color: #1B365D !important;
+        font-weight: 800 !important;
+    }
+    
+    [data-testid="stCaptionContainer"] p {
+        color: #334155 !important;
+        font-weight: 600 !important;
+    }
+    
+    div.stAlert {
+        background-color: #E2E8F0 !important;
+        color: #0F172A !important;
+        border-left: 6px solid #1B365D !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+    }
+    div.stAlert p {
+        color: #0F172A !important;
+        font-size: 1.02rem !important;
+    }
+    
+    [data-testid="stChatMessage"] {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #CBD5E1 !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
+    }
+    [data-testid="stChatMessage"] p {
+        color: #0F172A !important;
+        font-size: 1.05rem !important;
+        line-height: 1.5 !important;
+    }
+    
+    .stButton>button {
+        background-color: #1B365D !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        border: none !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 2px 6px rgba(27, 54, 93, 0.2) !important;
+    }
+    .stButton>button p {
+        color: #FFFFFF !important;
+    }
+    .stButton>button:hover {
+        background-color: #0F2342 !important;
+        box-shadow: 0 4px 12px rgba(15, 35, 66, 0.3) !important;
+    }
+    
+    input, textarea {
+        color: #0F172A !important;
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #94A3B8 !important;
+        border-radius: 6px !important;
+        font-size: 1rem !important;
+    }
+    
+    button[data-baseweb="tab"] p {
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        color: #1B365D !important;
+    }
+    
+    .stExpander {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+init_db()
+
+existing_cases = get_casos_ecoe()
+if not existing_cases:
+    from importer import import_all_stations
+    import_all_stations()
+    existing_cases = get_casos_ecoe()
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "patient_agent" not in st.session_state:
+    st.session_state.patient_agent = None
+if "evaluator_agent" not in st.session_state:
+    st.session_state.evaluator_agent = None
+if "last_evaluation" not in st.session_state:
+    st.session_state.last_evaluation = None
+if "station_start_time" not in st.session_state:
+    st.session_state.station_start_time = None
+if "enable_tts" not in st.session_state:
+    st.session_state.enable_tts = True
+if "docente_autenticado" not in st.session_state:
+    st.session_state.docente_autenticado = False
+if "showing_inter_station_feedback" not in st.session_state:
+    st.session_state.showing_inter_station_feedback = False
+if "last_station_feedback" not in st.session_state:
+    st.session_state.last_station_feedback = None
+
+if "circuit_active" not in st.session_state:
+    st.session_state.circuit_active = False
+if "circuit_current_index" not in st.session_state:
+    st.session_state.circuit_current_index = 0
+if "circuit_student_name" not in st.session_state:
+    st.session_state.circuit_student_name = ""
+if "circuit_results" not in st.session_state:
+    st.session_state.circuit_results = []
+
+def render_voice_input_widget():
+    st.caption("🎙️ **Control de Voz:** Puedes presionar el micrófono para hablarle al paciente o escribir abajo.")
+    voice_html = """
+    <div style="background-color: #E2E8F0; padding: 12px; border-radius: 8px; border: 1.5px solid #CBD5E1; text-align: center; margin-bottom: 10px;">
+        <button id="micBtn" style="background-color: #DC2626; color: white; border: none; padding: 10px 18px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+            🎙️ Hablar al Paciente (Presionar para Dictar)
+        </button>
+        <span id="statusTxt" style="margin-left: 10px; font-weight: 600; color: #1E293B;">Micrófono Listo.</span>
+    </div>
+    <script>
+        const btn = document.getElementById('micBtn');
+        const statusTxt = document.getElementById('statusTxt');
+        
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'es-CL';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            let isListening = false;
+            
+            btn.onclick = function() {
+                if (!isListening) {
+                    recognition.start();
+                    isListening = true;
+                    btn.style.backgroundColor = '#059669';
+                    btn.innerHTML = '🔴 Escuchando... (Habla ahora)';
+                    statusTxt.innerText = 'Escuchando tu voz...';
+                } else {
+                    recognition.stop();
+                    isListening = false;
+                    btn.style.backgroundColor = '#DC2626';
+                    btn.innerHTML = '🎙️ Hablar al Paciente (Presionar para Dictar)';
+                    statusTxt.innerText = 'Detenido.';
+                }
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                statusTxt.innerText = 'Transcrito: "' + transcript + '"';
+                
+                const chatInput = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+                if (chatInput) {
+                    chatInput.value = transcript;
+                    chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    chatInput.focus();
+                }
+                
+                btn.style.backgroundColor = '#DC2626';
+                btn.innerHTML = '🎙️ Hablar al Paciente (Presionar para Dictar)';
+                isListening = false;
+            };
+            
+            recognition.onerror = function(event) {
+                statusTxt.innerText = 'Error de micrófono: ' + event.error;
+                btn.style.backgroundColor = '#DC2626';
+                btn.innerHTML = '🎙️ Hablar al Paciente (Presionar para Dictar)';
+                isListening = false;
+            };
+        } else {
+            statusTxt.innerText = 'Tu navegador no soporta reconocimiento por voz directo (Usar Chrome o Edge).';
+        }
+    </script>
+    """
+    components.html(voice_html, height=75)
+
+def render_patient_tts(text_to_speak):
+    clean_text = json.dumps(text_to_speak.replace('"', '\"'))
+    tts_html = f"""
+    <script>
+        if ('speechSynthesis' in window) {{
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance({clean_text});
+            utterance.lang = 'es-CL';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }}
+    </script>
+    """
+    components.html(tts_html, height=0)
+
+# --- BARRA LATERAL CONFIGURACIÓN ---
+with st.sidebar:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, use_container_width=True)
+    
+    st.title("🏥 SIMULADOR ECOE UACh")
+    st.caption("Plataforma Oficial de Evaluación y Pacientes Virtuales")
+    
+    st.markdown("---")
+    role_mode = st.radio("Modo de Interfaz:", ["🎓 Modo Interno (Examen Estudiante)", "👨‍🏫 Modo Docente / Administrador"])
+    
+    st.markdown("---")
+    st.session_state.enable_tts = st.checkbox("🔊 Activar Voz Hablada del Paciente (TTS)", value=st.session_state.enable_tts)
+    
+    st.markdown("---")
+    st.subheader("⚙️ Configuración de la IA")
+    api_key_input = st.text_input("Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
+    
+    if api_key_input:
+        os.environ["GEMINI_API_KEY"] = api_key_input
+        st.session_state.patient_agent = StandardizedPatientAgent(api_key=api_key_input)
+        st.session_state.evaluator_agent = OSCEEvaluatorAgent(api_key=api_key_input)
+        st.success("🤖 Agentes IA Conectados.")
+    else:
+        st.warning("⚠️ Ingrese su API Key de Gemini para activar la simulación.")
+
+    st.markdown("---")
+    st.caption("UACh - Facultad de Medicina / Internado de Cirugía")
+
+# =============================================================================
+# MODO INTERNO (EXAMEN Y PACIENTE SIMULADO)
+# =============================================================================
+if "🎓 Modo Interno" in role_mode:
+    c_head1, c_head2 = st.columns([1, 4])
+    with c_head1:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with c_head2:
+        st.title("🏥 Box de Atención Virtual - Examen ECOE UACh")
+        st.caption("Simulación clínica interactiva con Paciente Estandarizado de Inteligencia Artificial.")
+    
+    exam_type = st.radio("Modalidad de Evaluación:", ["🏆 Circuito Completo de Estaciones", "🔄 Práctica de Estación Individual"], horizontal=True)
+    
+    casos = get_casos_ecoe()
+    
+    # --- MODALIDAD A: CIRCUITO COMPLETO DE ESTACIONES ---
+    if "Circuito Completo" in exam_type:
+        if not st.session_state.circuit_active and not st.session_state.circuit_results and not st.session_state.showing_inter_station_feedback:
+            st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar cada una, recibirás un breve resumen antes de avanzar a la siguiente.")
+            
+            c_name, c_btn = st.columns([3, 1])
+            with c_name:
+                student_input_name = st.text_input("Ingresa tu Nombre Completo (Interno/a):", value="")
+            with c_btn:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🚀 Iniciar Examen ECOE", type="primary"):
+                    if not student_input_name.strip():
+                        st.error("⚠️ Ingresa tu nombre antes de iniciar el examen.")
+                    else:
+                        st.session_state.circuit_active = True
+                        st.session_state.circuit_current_index = 0
+                        st.session_state.circuit_student_name = student_input_name.strip()
+                        st.session_state.circuit_results = []
+                        st.session_state.chat_history = []
+                        st.session_state.station_start_time = time.time()
+                        st.session_state.showing_inter_station_feedback = False
+                        st.rerun()
+
+        # BREVE FEEDBACK DE TRANSICIÓN ENTRE ESTACIONES
+        elif st.session_state.showing_inter_station_feedback:
+            st.success("✅ **¡Estación Completada!**")
+            fb_item = st.session_state.last_station_feedback
+            st.subheader(f"💡 Resumen Breve de Evaluación: {fb_item['estacion']}")
+            
+            st.info(f"**Observaciones del Evaluador:**\n\n{fb_item['feedback']}")
+            st.write(f"Rendimiento en esta estación: **{fb_item['porcentaje']:.1f}%**")
+            
+            st.markdown("---")
+            if st.button("➡️ Avanzar Inmediatamente a la Siguiente Estación ➔", type="primary"):
+                st.session_state.showing_inter_station_feedback = False
+                st.session_state.circuit_active = True
+                st.session_state.chat_history = []
+                st.session_state.station_start_time = time.time()
+                st.rerun()
+
+        elif st.session_state.circuit_active:
+            idx = st.session_state.circuit_current_index
+            total_st = len(casos)
+            
+            if idx < total_st:
+                current_caso = casos[idx]
+                gt_data = json.loads(current_caso["ground_truth_json"])
+                
+                col_st1, col_st2 = st.columns([3, 1])
+                with col_st1:
+                    st.subheader(f"Estación N° {idx+1} de {total_st}: {current_caso['titulo']} ({current_caso['especialidad']})")
+                    st.caption(f"Interno Evaluado: **{st.session_state.circuit_student_name}**")
+                with col_st2:
+                    elapsed = time.time() - st.session_state.station_start_time
+                    remaining = max(0, 420 - int(elapsed))
+                    mins, secs = divmod(remaining, 60)
+                    
+                    if remaining <= 60 and remaining > 0:
+                        st.markdown(f"<h2 style='color: #DC2626; text-align: center;'>⏱️ {mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True)
+                        st.error("⚠️ ¡Queda 1 minuto para finalizar la estación!")
+                    else:
+                        st.markdown(f"<h2 style='color: #1B365D; text-align: center;'>⏱️ {mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True)
+
+                st.progress((idx + 1) / total_st)
+                
+                st.info(f"📋 **HOJA DE INSTRUCCIONES PARA EL INTERNO (DOOR SHEET):**\n\n" +
+                        f"* **Ubicación / Contexto:** {gt_data.get('motivo_consulta')}\n" +
+                        f"* **Paciente:** {gt_data.get('paciente_nombre')}, {gt_data.get('edad', '50')} años.\n" +
+                        f"* **Tareas:** Realice la anamnesis focalizada, indique si examina al paciente o solicite los exámenes de laboratorio/imágenes necesarios. Indique su manejo táctico inicial.")
+                
+                for msg in st.session_state.chat_history:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
+
+                render_voice_input_widget()
+
+                user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
+                if user_input:
+                    if not st.session_state.patient_agent:
+                        st.error("⚠️ Ingrese su API Key en la barra lateral para conversar.")
+                    else:
+                        st.session_state.chat_history.append({"role": "user", "content": user_input})
+                        with st.spinner("El paciente está respondiendo..."):
+                            resp = st.session_state.patient_agent.respond_to_student(gt_data, st.session_state.chat_history, user_input)
+                            st.session_state.chat_history.append({"role": "assistant", "content": resp})
+                            
+                            if st.session_state.enable_tts:
+                                render_patient_tts(resp)
+                                
+                            st.rerun()
+
+                st.markdown("---")
+                col_b1, col_b2 = st.columns([2, 1])
+                with col_b2:
+                    if st.button(f"🏁 Finalizar Estación {idx+1} y Ver Breve Feedback ➔", type="primary"):
+                        if not st.session_state.evaluator_agent:
+                            st.error("⚠️ Requiere API Key para evaluar.")
+                        else:
+                            with st.spinner(f"Evaluando Estación {idx+1}..."):
+                                eval_rep = st.session_state.evaluator_agent.evaluate_simulation(gt_data, st.session_state.chat_history)
+                                s_id = insert_sesion_simulacion(current_caso["id"], st.session_state.circuit_student_name, st.session_state.chat_history)
+                                insert_evaluacion(
+                                    sesion_id=s_id,
+                                    p_global=eval_rep["total_score_percentage"],
+                                    p_anamnesis=eval_rep["score_anamnesis"],
+                                    p_ef=eval_rep["score_physical_exam"],
+                                    p_exam=eval_rep["score_diagnostic_tests"],
+                                    p_diag=eval_rep["score_diagnosis_accuracy"],
+                                    p_conducta=eval_rep["score_clinical_management"],
+                                    feedback=eval_rep["qualitative_feedback"]
+                                )
+                                fb_entry = {
+                                    "estacion": f"Estación {idx+1}: {current_caso['titulo']}",
+                                    "especialidad": current_caso["especialidad"],
+                                    "porcentaje": eval_rep["total_score_percentage"],
+                                    "feedback": eval_rep["qualitative_feedback"]
+                                }
+                                st.session_state.circuit_results.append(fb_entry)
+                                st.session_state.last_station_feedback = fb_entry
+                                
+                                st.session_state.circuit_current_index += 1
+                                
+                                if st.session_state.circuit_current_index >= total_st:
+                                    st.session_state.circuit_active = False
+                                    st.session_state.showing_inter_station_feedback = False
+                                else:
+                                    st.session_state.circuit_active = False
+                                    st.session_state.showing_inter_station_feedback = True
+                                    
+                                st.rerun()
+
+        if st.session_state.circuit_results and not st.session_state.circuit_active and not st.session_state.showing_inter_station_feedback:
+            st.balloons()
+            st.success(f"🎉 **¡EXAMEN ECOE COMPLETO FINALIZADO!**")
+            st.subheader(f"📜 Confirmación de Entrega de Examen - {st.session_state.circuit_student_name}")
+            
+            res = st.session_state.circuit_results
+            avg_pct = sum(r["porcentaje"] for r in res) / len(res)
+            
+            if avg_pct >= 60.0:
+                nota_final = 4.0 + 3.0 * ((avg_pct - 60.0) / 40.0)
+            else:
+                nota_final = 1.0 + 3.0 * (avg_pct / 60.0)
+                
+            nota_final = round(nota_final, 1)
+            
+            st.info("✅ **Tus respuestas y evaluaciones han sido registradas de forma segura en el sistema docente.** El equipo docente revisará tu calificación final.")
+            
+            k1, k2 = st.columns(2)
+            k1.metric("Estaciones Rendidas", f"{len(res)} / {len(casos)}")
+            k2.metric("Estado del Examen", "ENVIADO Y REGISTRADO")
+            
+            if st.button("🔄 Rendir Nuevo Examen"):
+                st.session_state.circuit_active = False
+                st.session_state.circuit_current_index = 0
+                st.session_state.circuit_results = []
+                st.session_state.showing_inter_station_feedback = False
+                st.rerun()
+
+    # --- MODALIDAD B: PRÁCTICA INDIVIDUAL ---
+    else:
+        st.subheader("🔄 Modulo de Práctica Individual de Estación")
+        
+        c_sel, c_al = st.columns([2, 1])
+        with c_sel:
+            caso_opts = {c["id"]: f"[{c['codigo_estacion']}] {c['titulo']} ({c['especialidad']})" for c in casos}
+            sel_id = st.selectbox("Selecciona la Estación:", options=list(caso_opts.keys()), format_func=lambda x: caso_opts[x])
+            curr_c = next((c for c in casos if c["id"] == sel_id), None)
+            gt = json.loads(curr_c["ground_truth_json"]) if curr_c else {}
+        with c_al:
+            st_name = st.text_input("Tu Nombre:", value="Interno/a de Medicina")
+            if st.button("🔄 Reiniciar Esta Estación"):
+                st.session_state.chat_history = []
+                st.session_state.last_evaluation = None
+                st.rerun()
+                
+        st.info(f"📋 **HOJA DEL ALUMNO (DOOR SHEET):**\n\n" +
+                f"* **Motivo de Consulta:** {gt.get('motivo_consulta')}\n" +
+                f"* **Paciente:** {gt.get('paciente_nombre')}, {gt.get('edad', '50')} años.\n" +
+                f"* **Tareas:** Realiza la anamnesis, examen físico o pide exámenes. Cuentas con 7 minutos.")
+
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        render_voice_input_widget()
+
+        u_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
+        if u_input:
+            if not st.session_state.patient_agent:
+                st.error("⚠️ Clave API requerida en la barra lateral.")
+            else:
+                st.session_state.chat_history.append({"role": "user", "content": u_input})
+                with st.spinner("El paciente está respondiendo..."):
+                    r_text = st.session_state.patient_agent.respond_to_student(gt, st.session_state.chat_history, u_input)
+                    st.session_state.chat_history.append({"role": "assistant", "content": r_text})
+                    
+                    if st.session_state.enable_tts:
+                        render_patient_tts(r_text)
+                        
+                    st.rerun()
+
+        if len(st.session_state.chat_history) >= 2:
+            st.markdown("---")
+            if st.button("🏁 Finalizar Estación y Obtener Calificación", type="primary"):
+                if not st.session_state.evaluator_agent:
+                    st.error("⚠️ Clave API requerida.")
+                else:
+                    with st.spinner("El Profesor Evaluador está calificando la sesión..."):
+                        report = st.session_state.evaluator_agent.evaluate_simulation(gt, st.session_state.chat_history)
+                        st.session_state.last_evaluation = report
+                        s_id = insert_sesion_simulacion(sel_id, st_name, st.session_state.chat_history)
+                        insert_evaluacion(
+                            sesion_id=s_id,
+                            p_global=report["total_score_percentage"],
+                            p_anamnesis=report["score_anamnesis"],
+                            p_ef=report["score_physical_exam"],
+                            p_exam=report["score_diagnostic_tests"],
+                            p_diag=report["score_diagnosis_accuracy"],
+                            p_conducta=report["score_clinical_management"],
+                            feedback=report["qualitative_feedback"]
+                        )
+                        st.success("🎉 ¡Evaluación completada!")
+
+# =============================================================================
+# MODO DOCENTE / ADMINISTRADOR (PROTEGIDO POR CONTRASEÑA/PIN)
+# =============================================================================
+else:
+    c_ad1, c_ad2 = st.columns([1, 4])
+    with c_ad1:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=150)
+    with c_ad2:
+        st.title("👨‍🏫 Panel Docente y Administración ECOE UACh")
+        st.caption("Gestión confidencial de estaciones, pautas secretas e historial de notas.")
+    
+    if not st.session_state.docente_autenticado:
+        st.warning("🔒 **Acceso Protegido solo para Profesores y Evaluadores.**")
+        pass_input = st.text_input("Ingresa la Clave de Docente (PIN):", type="password")
+        if st.button("🔑 Ingresar al Panel Docente", type="primary"):
+            if pass_input == DOCENTE_PIN:
+                st.session_state.docente_autenticado = True
+                st.success("🔓 Autenticación Exitosa.")
+                st.rerun()
+            else:
+                st.error("❌ Clave incorrecta. Acceso denegado.")
+    else:
+        if st.button("🔒 Cerrar Sesión Docente"):
+            st.session_state.docente_autenticado = False
+            st.rerun()
+            
+        t1, t2, t3 = st.tabs(["📊 Registro de Notas e Histórico Alumnos", "📚 Banco de Estaciones Registradas", "➕ Crear Nueva Estación"])
+        
+        with t1:
+            st.subheader("📊 Histórico de Evaluaciones y Calificaciones de Alumnos")
+            evals = get_todas_evaluaciones()
+            
+            if evals:
+                st.write(f"Total de Sesiones Evaluadas: **{len(evals)}**")
+                for ev_item in evals:
+                    pct = ev_item["puntaje_global"]
+                    nota = (4.0 + 3.0 * ((pct - 60.0) / 40.0)) if pct >= 60.0 else (1.0 + 3.0 * (pct / 60.0))
+                    
+                    with st.expander(f"👤 Alumno: {ev_item['alumno_nombre']} | [{ev_item['codigo_estacion']}] {ev_item['titulo']} | NOTA: {nota:.1f} ({pct:.1f}%)"):
+                        st.write(f"**Fecha y Hora:** {ev_item['fecha_sesion']}")
+                        st.write(f"**Desglose Puntajes:** Anamnesis {ev_item['p_anamnesis']}/20 | Examen Físico {ev_item['p_ef']}/20 | Exámenes {ev_item['p_exam']}/20 | Diagnóstico {ev_item['p_diag']}/20 | Conducta {ev_item['p_conducta']}/20")
+                        st.info(f"**Feedback Docente:** {ev_item['feedback_docente']}")
+            else:
+                st.info("Aún no hay evaluaciones registradas en la base de datos.")
+                    
+        with t2:
+            st.subheader("⚙️ Banco de Estaciones ECOE en SQLite")
+            casos = get_casos_ecoe()
+            st.write(f"Total de Estaciones Activas: **{len(casos)}**")
+            
+            for c in casos:
+                gt = json.loads(c["ground_truth_json"])
+                with st.expander(f"📌 [{c['codigo_estacion']}] {c['titulo']} - {c['especialidad']} ({c['dificultad']})"):
+                    st.markdown(f"**Paciente:** {gt.get('paciente_nombre')}, {gt.get('edad', '50')} años")
+                    st.markdown(f"**Motivo de Consulta:** {gt.get('motivo_consulta')}")
+                    st.markdown(f"**Historia Clínica:** {gt.get('historia_clinica')}")
+                    st.markdown(f"**Diagnóstico Indiscutible:** {gt.get('diagnostico_correcto')}")
+                    st.markdown(f"**Conducta Esperada:** {gt.get('conducta_correcta')}")
+                    
+        with t3:
+            st.subheader("➕ Agregar Nueva Estación ECOE al Banco")
+            
+            with st.form("form_nuevo_caso"):
+                c_code = st.text_input("Código Estación (ej. EST-301):", value=f"EST-{len(get_casos_ecoe())+201}")
+                c_tit = st.text_input("Título del Caso / Patología:", value="")
+                c_esp = st.selectbox("Especialidad:", ["Cirugía General", "Cirugía de Urgencias", "Cirugía Digestiva", "Cirugía Vascular", "Cirugía Torácica", "Coloproctología", "Cirugía Oncológica", "Traumatología", "Medicina Interna"])
+                c_dif = st.selectbox("Dificultad:", ["Básico (7mo Año)", "Intermedio (Interno Medicina)", "Avanzado"])
+                
+                st.markdown("---")
+                st.markdown("##### Secreto del Caso y Pauta de Evaluación (Ground Truth):")
+                p_nom = st.text_input("Nombre del Paciente Simulado:", value="Juan Pérez")
+                p_edad = st.text_input("Edad:", value="50")
+                p_mot = st.text_area("Motivo de Consulta (Visible al alumno):", value="")
+                p_hist = st.text_area("Historia Clínica Completa (Guion del paciente):", value="")
+                p_ef = st.text_area("Hallazgos al Examen Físico (Solo revelar si el alumno examina):", value="")
+                p_ex = st.text_area("Exámenes de Laboratorio e Imágenes (Solo revelar si los pide):", value="")
+                p_diag = st.text_input("Diagnóstico Correcto (Indiscutible):", value="")
+                p_cond = st.text_area("Conducta y Manejo Táctico Correcto:", value="")
+                
+                btn_save = st.form_submit_button("💾 Guardar Estación en SQLite", type="primary")
+                if btn_save:
+                    gt_dict = {
+                        "paciente_nombre": p_nom,
+                        "edad": p_edad,
+                        "motivo_consulta": p_mot,
+                        "historia_clinica": p_hist,
+                        "examen_fisico": p_ef,
+                        "examenes_laboratorio_imagenes": p_ex,
+                        "diagnostico_correcto": p_diag,
+                        "conducta_correcta": p_cond
+                    }
+                    insert_caso_ecoe(c_code, c_tit, c_esp, c_dif, gt_dict)
+                    st.success(f"🎉 Estación [{c_code}] {c_tit} guardada correctamente.")
+                    st.rerun()
