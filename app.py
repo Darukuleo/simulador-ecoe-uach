@@ -9,7 +9,8 @@ from datetime import datetime, time as dt_time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 from database import (
     init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
-    get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen
+    get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen,
+    insert_encuesta_investigacion, get_todas_encuestas
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
@@ -153,6 +154,10 @@ if "showing_inter_station_feedback" not in st.session_state:
     st.session_state.showing_inter_station_feedback = False
 if "last_station_feedback" not in st.session_state:
     st.session_state.last_station_feedback = None
+if "showing_survey" not in st.session_state:
+    st.session_state.showing_survey = False
+if "survey_completed" not in st.session_state:
+    st.session_state.survey_completed = False
 
 if "circuit_active" not in st.session_state:
     st.session_state.circuit_active = False
@@ -246,7 +251,6 @@ def render_patient_tts(text_to_speak):
     """
     components.html(tts_html, height=0)
 
-# Verificación de Horario y Apertura de Examen
 def is_exam_open_now():
     config = get_config_examen()
     if not config["examen_habilitado"]:
@@ -307,7 +311,6 @@ if "🎓 Modo Interno" in role_mode:
         st.title("🏥 Box de Atención Virtual - Examen ECOE UACh")
         st.caption("Simulación clínica interactiva con Paciente Estandarizado de Inteligencia Artificial.")
     
-    # VERIFICAR SI EL EXAMEN ESTÁ ABIERTO O CERRADO
     exam_open, open_reason = is_exam_open_now()
     
     if not exam_open:
@@ -320,8 +323,8 @@ if "🎓 Modo Interno" in role_mode:
         
         # --- MODALIDAD A: CIRCUITO COMPLETO DE ESTACIONES ---
         if "Circuito Completo" in exam_type:
-            if not st.session_state.circuit_active and not st.session_state.circuit_results and not st.session_state.showing_inter_station_feedback:
-                st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar cada una, recibirás un breve resumen antes de avanzar a la siguiente.")
+            if not st.session_state.circuit_active and not st.session_state.circuit_results and not st.session_state.showing_inter_station_feedback and not st.session_state.showing_survey:
+                st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar el circuito completo, responderás una breve Encuesta de Investigación Médica.")
                 
                 c_name, c_btn = st.columns([3, 1])
                 with c_name:
@@ -339,6 +342,7 @@ if "🎓 Modo Interno" in role_mode:
                             st.session_state.chat_history = []
                             st.session_state.station_start_time = time.time()
                             st.session_state.showing_inter_station_feedback = False
+                            st.session_state.showing_survey = False
                             st.rerun()
 
             elif st.session_state.showing_inter_station_feedback:
@@ -442,38 +446,80 @@ if "🎓 Modo Interno" in role_mode:
                                     if st.session_state.circuit_current_index >= total_st:
                                         st.session_state.circuit_active = False
                                         st.session_state.showing_inter_station_feedback = False
+                                        st.session_state.showing_survey = True
                                     else:
                                         st.session_state.circuit_active = False
                                         st.session_state.showing_inter_station_feedback = True
                                         
                                     st.rerun()
 
-            if st.session_state.circuit_results and not st.session_state.circuit_active and not st.session_state.showing_inter_station_feedback:
+            # PANTALLA DE ENCUESTA AUTOMÁTICA POST-ECOE
+            elif st.session_state.showing_survey and not st.session_state.survey_completed:
                 st.balloons()
-                st.success(f"🎉 **¡EXAMEN ECOE COMPLETO FINALIZADO!**")
+                st.success("🎉 **¡CIRCUITO DE ESTACIONES FINALIZADO CON ÉXITO!**")
+                st.subheader(f"📋 Cuestionario de Percepción e Investigación Pedagógica - {st.session_state.circuit_student_name}")
+                st.caption("Por favor responde estas breves preguntas (1 a 5) para guardar oficialmente tus resultados en la plataforma.")
+                
+                with st.form("form_encuesta_investigacion"):
+                    st.markdown("##### 🔹 Dimensión I: Fidelidad Clínica y Realismo")
+                    f1 = st.slider("F1: El paciente de IA respondió de forma clínicamente coherente y realista.", 1, 5, 4)
+                    f2 = st.slider("F2: El paciente mantuvo el tono emocional (dolor, preocupación, ansiedad) adecuado.", 1, 5, 4)
+                    f3 = st.slider("F3: La entrega de hallazgos del examen físico y exámenes fue precisa.", 1, 5, 4)
+                    f4 = st.slider("F4: Sentí que estaba interactuando con un paciente real en un box.", 1, 5, 4)
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔹 Dimensión II: Usabilidad y Experiencia de Usuario")
+                    u1 = st.slider("U1: La interfaz web fue clara, intuitiva y fácil de navegar.", 1, 5, 5)
+                    u2 = st.slider("U2: El tiempo de 7 minutos por estación fue adecuado.", 1, 5, 4)
+                    u3 = st.slider("U3: El reloj cronómetro en pantalla me ayudó a gestionar la consulta.", 1, 5, 4)
+                    u4 = st.slider("U4: No experimenté dificultades técnicas que interfirieran.", 1, 5, 5)
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔹 Dimensión III: Valor Pedagógico")
+                    p1 = st.slider("P1: El examen me permitió probar mis competencias de razonamiento clínico.", 1, 5, 5)
+                    p2 = st.slider("P2: El feedback breve al finalizar cada estación fue útil.", 1, 5, 5)
+                    p3 = st.slider("P3: Esta modalidad con IA es valiosa para preparar mi examen de grado / EUNACOM.", 1, 5, 5)
+                    p4 = st.slider("P4: Recomendaría incorporar este simulador de forma permanente en el Internado.", 1, 5, 5)
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔹 Dimensión IV: Interacción por Voz")
+                    v1 = st.slider("V1: Hablarle al paciente por el micrófono facilitó la fluidez de la consulta.", 1, 5, 4)
+                    v2 = st.slider("V2: Escuchar la respuesta hablada del paciente aportó mayor realismo.", 1, 5, 4)
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔹 Dimensión V: Comentarios Cualitativos")
+                    q1 = st.text_area("1. ¿Qué fortalezas destacaría de realizar el ECOE con Pacientes Simulado de IA?", value="")
+                    q2 = st.text_area("2. ¿Qué limitaciones o aspectos a mejorar identificó durante las estaciones?", value="")
+                    q3 = st.text_area("3. En comparación con un ECOE tradicional con actores humanos, ¿qué ventajas/desventajas percibe?", value="")
+                    
+                    btn_survey = st.form_submit_button("💾 Guardar Encuesta y Finalizar Examen ECOE", type="primary")
+                    if btn_survey:
+                        likert_dict = {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "U1": u1, "U2": u2, "U3": u3, "U4": u4, "P1": p1, "P2": p2, "P3": p3, "P4": p4, "V1": v1, "V2": v2}
+                        qual_dict = {"Q1": q1.strip(), "Q2": q2.strip(), "Q3": q3.strip()}
+                        insert_encuesta_investigacion(st.session_state.circuit_student_name, likert_dict, qual_dict)
+                        st.session_state.survey_completed = True
+                        st.session_state.showing_survey = False
+                        st.rerun()
+
+            elif st.session_state.circuit_results and not st.session_state.circuit_active and not st.session_state.showing_inter_station_feedback:
+                st.balloons()
+                st.success(f"🎉 **¡EXAMEN ECOE Y ENCUESTA FINALIZADOS!**")
                 st.subheader(f"📜 Confirmación de Entrega de Examen - {st.session_state.circuit_student_name}")
                 
                 res = st.session_state.circuit_results
-                avg_pct = sum(r["porcentaje"] for r in res) / len(res)
-                
-                if avg_pct >= 60.0:
-                    nota_final = 4.0 + 3.0 * ((avg_pct - 60.0) / 40.0)
-                else:
-                    nota_final = 1.0 + 3.0 * (avg_pct / 60.0)
-                    
-                nota_final = round(nota_final, 1)
-                
-                st.info("✅ **Tus respuestas y evaluaciones han sido registradas de forma segura en el sistema docente.** El equipo docente revisará tu calificación final.")
+                st.info("✅ **Tus respuestas, evaluaciones y encuesta han sido registradas de forma segura en el sistema.** El equipo docente revisará tu calificación final.")
                 
                 k1, k2 = st.columns(2)
                 k1.metric("Estaciones Rendidas", f"{len(res)} / {len(casos)}")
-                k2.metric("Estado del Examen", "ENVIADO Y REGISTRADO")
+                k2.metric("Estado de Respuestas y Encuesta", "REGISTRADAS Y GUARDADAS")
                 
                 if st.button("🔄 Rendir Nuevo Examen"):
                     st.session_state.circuit_active = False
                     st.session_state.circuit_current_index = 0
                     st.session_state.circuit_results = []
                     st.session_state.showing_inter_station_feedback = False
+                    st.session_state.showing_survey = False
+                    st.session_state.survey_completed = False
                     st.rerun()
 
         # --- MODALIDAD B: PRÁCTICA INDIVIDUAL ---
@@ -551,7 +597,7 @@ else:
             st.image(LOGO_PATH, width=150)
     with c_ad2:
         st.title("👨‍🏫 Panel Docente y Administración ECOE UACh")
-        st.caption("Gestión confidencial de estaciones, pautas secretas, horario e historial de notas.")
+        st.caption("Gestión confidencial de estaciones, pautas secretas, horario, notas e investigación.")
     
     if not st.session_state.docente_autenticado:
         st.warning("🔒 **Acceso Protegido solo para Profesores y Evaluadores.**")
@@ -568,7 +614,7 @@ else:
             st.session_state.docente_autenticado = False
             st.rerun()
             
-        t1, t2, t3, t4 = st.tabs(["📊 Notas de Alumnos", "⏰ Control de Horario Examen", "📚 Banco de Estaciones", "➕ Crear Nueva Estación"])
+        t1, t2, t3, t4, t5 = st.tabs(["📊 Notas de Alumnos", "🔬 Resultados Investigación", "⏰ Control de Horario", "📚 Banco Estaciones", "➕ Crear Estación"])
         
         with t1:
             st.subheader("📊 Histórico de Evaluaciones y Calificaciones de Alumnos")
@@ -588,6 +634,35 @@ else:
                 st.info("Aún no hay evaluaciones registradas en la base de datos.")
 
         with t2:
+            st.subheader("🔬 Resultados y Datos de Investigación Médica (Encuestas Post-ECOE)")
+            encuestas = get_todas_encuestas()
+            
+            if encuestas:
+                st.write(f"Total de Encuestas Respondidas: **{len(encuestas)}**")
+                
+                f_prom = sum(e["fidelidad_promedio"] for e in encuestas) / len(encuestas)
+                u_prom = sum(e["usabilidad_promedio"] for e in encuestas) / len(encuestas)
+                p_prom = sum(e["pedagogico_promedio"] for e in encuestas) / len(encuestas)
+                v_prom = sum(e["voz_promedio"] for e in encuestas) / len(encuestas)
+                
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Fidelidad Clínica Promedio", f"{f_prom:.2f} / 5.0")
+                m2.metric("Usabilidad Promedio (TAM)", f"{u_prom:.2f} / 5.0")
+                m3.metric("Valor Pedagógico Promedio", f"{p_prom:.2f} / 5.0")
+                m4.metric("Interacción por Voz Promedio", f"{v_prom:.2f} / 5.0")
+                
+                st.markdown("---")
+                st.markdown("##### 📝 Respuestas Cualitativas de Internos para Publicación:")
+                for enc in encuestas:
+                    q_dict = json.loads(enc["respuestas_cualitativas_json"])
+                    with st.expander(f"👤 Interno/a: {enc['alumno_nombre']} ({enc['fecha_encuesta']})"):
+                        st.write(f"**Fortalezas destacadas:** {q_dict.get('Q1', 'Sin respuesta')}")
+                        st.write(f"**Aspectos a mejorar:** {q_dict.get('Q2', 'Sin respuesta')}")
+                        st.write(f"**Comparación con ECOE tradicional:** {q_dict.get('Q3', 'Sin respuesta')}")
+            else:
+                st.info("Aún no hay encuestas registradas. Aparecerán automáticamente cuando los internos completen el examen.")
+
+        with t3:
             st.subheader("⏰ Control de Recepción y Horario del Examen")
             cfg = get_config_examen()
             
@@ -613,7 +688,7 @@ else:
                 st.success("🎉 Configuración de horario actualizada correctamente.")
                 st.rerun()
 
-        with t3:
+        with t4:
             st.subheader("⚙️ Banco de Estaciones ECOE en SQLite")
             casos = get_casos_ecoe()
             st.write(f"Total de Estaciones Activas: **{len(casos)}**")
@@ -627,7 +702,7 @@ else:
                     st.markdown(f"**Diagnóstico Indiscutible:** {gt.get('diagnostico_correcto')}")
                     st.markdown(f"**Conducta Esperada:** {gt.get('conducta_correcta')}")
                     
-        with t4:
+        with t5:
             st.subheader("➕ Agregar Nueva Estación ECOE al Banco")
             
             with st.form("form_nuevo_caso"):

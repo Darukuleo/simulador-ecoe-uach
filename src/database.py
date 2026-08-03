@@ -186,3 +186,53 @@ def update_config_examen(examen_habilitado, modo_horario, fecha_examen, hora_ini
     """, (1 if examen_habilitado else 0, 1 if modo_horario else 0, fecha_examen, hora_inicio, hora_fin))
     conn.commit()
     conn.close()
+
+
+# --- TABLA Y FUNCIONES DE ENCUESTA DE INVESTIGACIÓN POST-ECOE ---
+def init_encuesta_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS encuestas_investigacion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alumno_nombre TEXT NOT NULL,
+            fidelidad_promedio REAL,
+            usabilidad_promedio REAL,
+            pedagogico_promedio REAL,
+            voz_promedio REAL,
+            respuestas_likert_json TEXT NOT NULL,
+            respuestas_cualitativas_json TEXT NOT NULL,
+            fecha_encuesta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+def insert_encuesta_investigacion(alumno_nombre: str, likert_dict: dict, cualitativa_dict: dict):
+    init_encuesta_table()
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    f_avg = (likert_dict.get("F1", 4) + likert_dict.get("F2", 4) + likert_dict.get("F3", 4) + likert_dict.get("F4", 4)) / 4.0
+    u_avg = (likert_dict.get("U1", 4) + likert_dict.get("U2", 4) + likert_dict.get("U3", 4) + likert_dict.get("U4", 4)) / 4.0
+    p_avg = (likert_dict.get("P1", 4) + likert_dict.get("P2", 4) + likert_dict.get("P3", 4) + likert_dict.get("P4", 4)) / 4.0
+    v_avg = (likert_dict.get("V1", 4) + likert_dict.get("V2", 4)) / 2.0
+    
+    cursor.execute("""
+        INSERT INTO encuestas_investigacion 
+        (alumno_nombre, fidelidad_promedio, usabilidad_promedio, pedagogico_promedio, voz_promedio, respuestas_likert_json, respuestas_cualitativas_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (alumno_nombre, f_avg, u_avg, p_avg, v_avg, json.dumps(likert_dict, ensure_ascii=False), json.dumps(cualitativa_dict, ensure_ascii=False)))
+    
+    conn.commit()
+    conn.close()
+
+def get_todas_encuestas() -> list:
+    init_encuesta_table()
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, alumno_nombre, fidelidad_promedio, usabilidad_promedio, pedagogico_promedio, voz_promedio, respuestas_likert_json, respuestas_cualitativas_json, fecha_encuesta FROM encuestas_investigacion ORDER BY id DESC")
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
