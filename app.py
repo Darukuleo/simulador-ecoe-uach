@@ -367,7 +367,7 @@ if "🎓 Modo Interno" in role_mode:
                     
                     col_st1, col_st2 = st.columns([3, 1])
                     with col_st1:
-                        st.subheader(f"Estación N° {idx+1} de {total_st}: Caso Clínico ({current_caso['especialidad']})")
+                        st.subheader(f"Estación N° {idx+1} de {total_st}: Box de Atención Virtual")
                         st.caption(f"Interno Evaluado: **{st.session_state.circuit_student_name}**")
                     with col_st2:
                         elapsed = time.time() - st.session_state.station_start_time
@@ -429,7 +429,7 @@ if "🎓 Modo Interno" in role_mode:
                                         feedback=eval_rep["qualitative_feedback"]
                                     )
                                     fb_entry = {
-                                        "estacion": f"Estación N° {idx+1} ({current_caso['especialidad']})",
+                                        "estacion": f"Estación N° {idx+1}",
                                         "especialidad": current_caso["especialidad"],
                                         "porcentaje": eval_rep["total_score_percentage"],
                                         "feedback": eval_rep["qualitative_feedback"]
@@ -482,7 +482,7 @@ if "🎓 Modo Interno" in role_mode:
             
             c_sel, c_al = st.columns([2, 1])
             with c_sel:
-                caso_opts = {c["id"]: f"[{c['codigo_estacion']}] Estación de {c['especialidad']} ({c['dificultad']})" for c in casos}
+                caso_opts = {c["id"]: f"[{c['codigo_estacion']}] Estación de Evaluación ({c['dificultad']})" for c in casos}
                 sel_id = st.selectbox("Selecciona la Estación:", options=list(caso_opts.keys()), format_func=lambda x: caso_opts[x])
                 curr_c = next((c for c in casos if c["id"] == sel_id), None)
                 gt = json.loads(curr_c["ground_truth_json"]) if curr_c else {}
