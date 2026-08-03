@@ -25,6 +25,31 @@ DOCENTE_PIN = os.environ.get("DOCENTE_PIN", "uach2026")
 # DISEÑO EXPERTO EN DOCENCIA MÉDICA
 st.markdown("""
     <style>
+
+    /* BLOQUEO TOTAL DE SEGURIDAD: Ocultar Barra Superior, GitHub, Share, Menú 3 Puntos y Footer */
+    header {
+        visibility: hidden !important;
+        display: none !important;
+        height: 0px !important;
+    }
+    [data-testid="stHeader"] {
+        display: none !important;
+    }
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    #MainMenu {
+        visibility: hidden !important;
+        display: none !important;
+    }
+    footer {
+        visibility: hidden !important;
+        display: none !important;
+    }
+    .stApp > header {
+        display: none !important;
+    }
+
     .stApp {
         background-color: #F4F1EA !important;
         color: #0F172A !important;
