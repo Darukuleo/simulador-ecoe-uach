@@ -4,9 +4,12 @@ import json
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "ecoe.db"))
 
-def init_db():
+def get_connection():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    return sqlite3.connect(DB_PATH, timeout=30.0)
+
+def init_db():
+    conn = get_connection()
     cursor = conn.cursor()
     
     # Tabla casos_ecoe
@@ -17,7 +20,7 @@ def init_db():
         titulo TEXT NOT NULL,
         especialidad TEXT NOT NULL,
         dificultad TEXT NOT NULL,
-        ground_truth_json TEXT NOT NULL, -- Historia clínica real, hallazgos examen físico, exámenes laboratorio y conducta esperada
+        ground_truth_json TEXT NOT NULL,
         fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -56,7 +59,7 @@ def init_db():
 
 def insert_caso_ecoe(codigo: str, titulo: str, especialidad: str, dificultad: str, ground_truth_data: dict) -> int:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
     gt_json = json.dumps(ground_truth_data, ensure_ascii=False)
     cursor.execute(
@@ -70,7 +73,7 @@ def insert_caso_ecoe(codigo: str, titulo: str, especialidad: str, dificultad: st
 
 def get_casos_ecoe() -> list:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT id, codigo_estacion, titulo, especialidad, dificultad, ground_truth_json FROM casos_ecoe ORDER BY id DESC")
@@ -80,7 +83,7 @@ def get_casos_ecoe() -> list:
 
 def insert_sesion_simulacion(caso_id: int, alumno_nombre: str, chat_history: list) -> int:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
     chat_json = json.dumps(chat_history, ensure_ascii=False)
     cursor.execute(
@@ -94,7 +97,7 @@ def insert_sesion_simulacion(caso_id: int, alumno_nombre: str, chat_history: lis
 
 def insert_evaluacion(sesion_id: int, p_global: float, p_anamnesis: float, p_ef: float, p_exam: float, p_diag: float, p_conducta: float, feedback: str):
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO evaluaciones (sesion_id, puntaje_global, puntaje_anamnesis, puntaje_examen_fisico, puntaje_examenes, puntaje_diagnostico, puntaje_conducta, feedback_docente) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -105,7 +108,7 @@ def insert_evaluacion(sesion_id: int, p_global: float, p_anamnesis: float, p_ef:
 
 def get_evaluaciones_por_alumno(alumno_nombre: str) -> list:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("""
@@ -122,11 +125,11 @@ def get_evaluaciones_por_alumno(alumno_nombre: str) -> list:
 
 def get_todas_evaluaciones() -> list:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT s.id as sesion_id, s.alumno_nombre, c.codigo_estacion, c.titulo, c.especialidad, e.puntaje_global, e.feedback_docente, s.fecha_sesion
+        SELECT s.id as sesion_id, s.alumno_nombre, c.codigo_estacion, c.titulo, c.especialidad, e.puntaje_global, e.puntaje_anamnesis, e.puntaje_examen_fisico, e.puntaje_examenes, e.puntaje_diagnostico, e.puntaje_conducta, e.feedback_docente, s.fecha_sesion
         FROM sesiones_simulacion s
         JOIN casos_ecoe c ON s.caso_id = c.id
         JOIN evaluaciones e ON e.sesion_id = s.id
@@ -136,9 +139,6 @@ def get_todas_evaluaciones() -> list:
     conn.close()
     return rows
 
-
-
-# --- TABLA Y FUNCIONES DE CONFIGURACIÓN DE HORARIO DE EXAMEN ---
 def init_config_table():
     conn = get_connection()
     cursor = conn.cursor()

@@ -18,7 +18,7 @@ class OSCEEvaluatorAgent:
     Agente Tutor / Evaluador Docente UACh de Estaciones ECOE/OSCE.
     Audita la transcripción de la consulta médica realizada por el interno y asigna la rúbrica oficial.
     """
-    def __init__(self, api_key=None, model_name="gemini-3.1-pro-preview"):
+    def __init__(self, api_key=None, model_name="gemini-flash-latest"):
         self.client = genai.Client(api_key=api_key or os.environ.get("GEMINI_API_KEY"))
         self.model_name = model_name
 

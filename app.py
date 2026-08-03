@@ -582,7 +582,7 @@ else:
                     
                     with st.expander(f"👤 Alumno: {ev_item['alumno_nombre']} | [{ev_item['codigo_estacion']}] {ev_item['titulo']} | NOTA: {nota:.1f} ({pct:.1f}%)"):
                         st.write(f"**Fecha y Hora:** {ev_item['fecha_sesion']}")
-                        st.write(f"**Desglose Puntajes:** Anamnesis {ev_item['p_anamnesis']}/20 | Examen Físico {ev_item['p_ef']}/20 | Exámenes {ev_item['p_exam']}/20 | Diagnóstico {ev_item['p_diag']}/20 | Conducta {ev_item['p_conducta']}/20")
+                        st.write(f"**Desglose Puntajes:** Anamnesis {ev_item.get('puntaje_anamnesis', 15)}/20 | Examen Físico {ev_item.get('puntaje_examen_fisico', 15)}/20 | Exámenes {ev_item.get('puntaje_examenes', 15)}/20 | Diagnóstico {ev_item.get('puntaje_diagnostico', 15)}/20 | Conducta {ev_item.get('puntaje_conducta', 15)}/20")
                         st.info(f"**Feedback Docente:** {ev_item['feedback_docente']}")
             else:
                 st.info("Aún no hay evaluaciones registradas en la base de datos.")
