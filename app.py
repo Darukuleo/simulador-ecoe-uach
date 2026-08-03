@@ -284,17 +284,24 @@ with st.sidebar:
     st.markdown("---")
     st.session_state.enable_tts = st.checkbox("🔊 Activar Voz Hablada del Paciente (TTS)", value=st.session_state.enable_tts)
     
-    st.markdown("---")
-    st.subheader("⚙️ Configuración de la IA")
-    api_key_input = st.text_input("Gemini API Key", type="password", value=os.environ.get("GEMINI_API_KEY", ""))
-    
-    if api_key_input:
-        os.environ["GEMINI_API_KEY"] = api_key_input
-        st.session_state.patient_agent = StandardizedPatientAgent(api_key=api_key_input)
-        st.session_state.evaluator_agent = OSCEEvaluatorAgent(api_key=api_key_input)
-        st.success("🤖 Agentes IA Conectados.")
+    # AUTO-CARGA SEGURA DE API KEY (INVISIBLE PARA EL ALUMNO)
+    secret_key = None
+    try:
+        if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+            secret_key = st.secrets["GEMINI_API_KEY"]
+    except:
+        pass
+    if not secret_key:
+        secret_key = os.environ.get("GEMINI_API_KEY")
+        
+    if secret_key:
+        os.environ["GEMINI_API_KEY"] = secret_key
+        if not st.session_state.patient_agent:
+            st.session_state.patient_agent = StandardizedPatientAgent(api_key=secret_key)
+            st.session_state.evaluator_agent = OSCEEvaluatorAgent(api_key=secret_key)
+        st.caption("🟢 Servidor IA Conectado y Seguro.")
     else:
-        st.warning("⚠️ Ingrese su API Key de Gemini para activar la simulación.")
+        st.caption("🔴 Servidor IA sin conexión. Configurar en Modo Docente.")
 
     st.markdown("---")
     st.caption("UACh - Facultad de Medicina / Internado de Cirugía")
