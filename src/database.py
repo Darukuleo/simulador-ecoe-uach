@@ -136,3 +136,53 @@ def get_todas_evaluaciones() -> list:
     conn.close()
     return rows
 
+
+
+# --- TABLA Y FUNCIONES DE CONFIGURACIÓN DE HORARIO DE EXAMEN ---
+def init_config_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS configuracion_examen (
+            id INTEGER PRIMARY KEY DEFAULT 1,
+            examen_habilitado INTEGER DEFAULT 1,
+            modo_horario INTEGER DEFAULT 0,
+            fecha_examen TEXT,
+            hora_inicio TEXT,
+            hora_fin TEXT
+        );
+    """)
+    cursor.execute("SELECT COUNT(*) FROM configuracion_examen;")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO configuracion_examen (id, examen_habilitado, modo_horario, fecha_examen, hora_inicio, hora_fin) VALUES (1, 1, 0, '', '08:00', '20:00');")
+    conn.commit()
+    conn.close()
+
+def get_config_examen():
+    init_config_table()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT examen_habilitado, modo_horario, fecha_examen, hora_inicio, hora_fin FROM configuracion_examen WHERE id = 1;")
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "examen_habilitado": bool(row[0]),
+            "modo_horario": bool(row[1]),
+            "fecha_examen": row[2],
+            "hora_inicio": row[3],
+            "hora_fin": row[4]
+        }
+    return {"examen_habilitado": True, "modo_horario": False, "fecha_examen": "", "hora_inicio": "08:00", "hora_fin": "20:00"}
+
+def update_config_examen(examen_habilitado, modo_horario, fecha_examen, hora_inicio, hora_fin):
+    init_config_table()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE configuracion_examen 
+        SET examen_habilitado = ?, modo_horario = ?, fecha_examen = ?, hora_inicio = ?, hora_fin = ?
+        WHERE id = 1;
+    """, (1 if examen_habilitado else 0, 1 if modo_horario else 0, fecha_examen, hora_inicio, hora_fin))
+    conn.commit()
+    conn.close()
