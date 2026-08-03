@@ -26,28 +26,31 @@ DOCENTE_PIN = os.environ.get("DOCENTE_PIN", "uach2026")
 st.markdown("""
     <style>
 
-    /* BLOQUEO TOTAL DE SEGURIDAD: Ocultar Barra Superior, GitHub, Share, Menú 3 Puntos y Footer */
-    header {
-        visibility: hidden !important;
-        display: none !important;
-        height: 0px !important;
-    }
-    [data-testid="stHeader"] {
-        display: none !important;
-    }
+    /* BLOQUEO SELECTIVO DE SEGURIDAD: Ocultar GitHub, Share, Lápiz, 3 Puntos y Footer; MANTENER BOTÓN DE BARRA LATERAL */
     [data-testid="stToolbar"] {
         display: none !important;
+        visibility: hidden !important;
     }
     #MainMenu {
-        visibility: hidden !important;
         display: none !important;
+        visibility: hidden !important;
     }
     footer {
+        display: none !important;
         visibility: hidden !important;
-        display: none !important;
     }
-    .stApp > header {
+    /* Ocultar específicamente los íconos de GitHub, Share y Edit dentro del header */
+    header button[title*="GitHub"], 
+    header button[title*="Share"], 
+    header a[href*="github.com"], 
+    header [data-testid="stToolbarActions"],
+    header [data-testid="stAppDeployButton"] {
         display: none !important;
+        visibility: hidden !important;
+    }
+    /* Hacer transparente el header pero permitir hacer clic en la flecha de la barra lateral */
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
     }
 
     .stApp {
