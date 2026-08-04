@@ -174,30 +174,28 @@ if not existing_cases:
     import_all_stations()
     existing_cases = get_casos_ecoe()
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "patient_agent" not in st.session_state:
-    st.session_state.patient_agent = None
-if "evaluator_agent" not in st.session_state:
-    st.session_state.evaluator_agent = None
-if "last_evaluation" not in st.session_state:
-    st.session_state.last_evaluation = None
-if "station_start_time" not in st.session_state:
-    st.session_state.station_start_time = None
-if "enable_tts" not in st.session_state:
-    st.session_state.enable_tts = True
-if "docente_autenticado" not in st.session_state:
-    st.session_state.docente_autenticado = False
-if "showing_inter_station_feedback" not in st.session_state:
-    st.session_state.showing_inter_station_feedback = False
-if "last_station_feedback" not in st.session_state:
-    st.session_state.last_station_feedback = None
-if "showing_survey" not in st.session_state:
-    st.session_state.showing_survey = False
-if "survey_completed" not in st.session_state:
-    st.session_state.survey_completed = False
-if "override_mode" not in st.session_state:
-    st.session_state.override_mode = None
+# INICIALIZACIÓN COMPLETA Y SEGURA DE SESSION_STATE
+keys_defaults = {
+    "chat_history": [],
+    "patient_agent": None,
+    "evaluator_agent": None,
+    "last_evaluation": None,
+    "station_start_time": None,
+    "enable_tts": True,
+    "docente_autenticado": False,
+    "showing_inter_station_feedback": False,
+    "last_station_feedback": None,
+    "showing_survey": False,
+    "survey_completed": False,
+    "override_mode": None,
+    "circuit_active": False,
+    "circuit_current_index": 0,
+    "circuit_student_name": "",
+    "circuit_results": []
+}
+for key, val in keys_defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
 def render_voice_input_widget():
     st.caption("🎙️ **Control de Voz:** Puedes presionar el micrófono para hablarle al paciente o escribir abajo.")
@@ -380,7 +378,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
         
         # --- MODALIDAD A: CIRCUITO COMPLETO DE ESTACIONES ---
         if "Circuito Completo" in exam_type:
-            if not st.session_state.circuit_active and not st.session_state.circuit_results and not st.session_state.showing_inter_station_feedback and not st.session_state.showing_survey:
+            if not st.session_state.get("circuit_active", False) and not bool(st.session_state.get("circuit_results", [])) and not st.session_state.get("showing_inter_station_feedback", False) and not st.session_state.get("showing_survey", False):
                 st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar el circuito completo, responderás una breve Encuesta de Investigación Médica.")
                 
                 c_name, c_btn = st.columns([3, 1])
