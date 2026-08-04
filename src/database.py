@@ -236,3 +236,41 @@ def get_todas_encuestas() -> list:
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+
+def export_all_data_json() -> str:
+    evals = get_todas_evaluaciones()
+    encuestas = get_todas_encuestas()
+    casos = get_casos_ecoe()
+    config = get_config_examen()
+    
+    backup = {
+        "evaluaciones": evals,
+        "encuestas": encuestas,
+        "casos": casos,
+        "configuracion": config
+    }
+    return json.dumps(backup, ensure_ascii=False, indent=2)
+
+def import_all_data_json(json_str: str) -> bool:
+    try:
+        data = json.loads(json_str)
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Import encuestas
+        if "encuestas" in data:
+            init_encuesta_table()
+            for enc in data["encuestas"]:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO encuestas_investigacion 
+                    (alumno_nombre, fidelidad_promedio, usabilidad_promedio, pedagogico_promedio, voz_promedio, respuestas_likert_json, respuestas_cualitativas_json, fecha_encuesta)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (enc.get("alumno_nombre"), enc.get("fidelidad_promedio"), enc.get("usabilidad_promedio"), enc.get("pedagogico_promedio"), enc.get("voz_promedio"), enc.get("respuestas_likert_json"), enc.get("respuestas_cualitativas_json"), enc.get("fecha_encuesta")))
+                
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print("Error al importar backup:", e)
+        return False

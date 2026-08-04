@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 from database import (
     init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
     get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen,
-    insert_encuesta_investigacion, get_todas_encuestas
+    insert_encuesta_investigacion, get_todas_encuestas, export_all_data_json, import_all_data_json
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
@@ -673,6 +673,24 @@ else:
         
         with t1:
             st.subheader("📊 Histórico de Evaluaciones y Calificaciones de Alumnos")
+            
+            c_bk1, c_bk2 = st.columns(2)
+            with c_bk1:
+                json_backup_str = export_all_data_json()
+                st.download_button(
+                    label="💾 Descargar Copia de Seguridad de Notas y Encuestas (JSON)",
+                    data=json_backup_str,
+                    file_name=f"ecoe_respuestas_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    type="primary"
+                )
+            with c_bk2:
+                uploaded_backup = st.file_uploader("📤 Restaurar Backup (JSON):", type=["json"])
+                if uploaded_backup is not None:
+                    content_str = uploaded_backup.read().decode("utf-8")
+                    if import_all_data_json(content_str):
+                        st.success("🎉 Backup restaurado con éxito.")
+                        st.rerun()
             evals = get_todas_evaluaciones()
             
             if evals:
