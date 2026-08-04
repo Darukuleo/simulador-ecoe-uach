@@ -5,6 +5,7 @@ import sys
 import json
 import time
 from datetime import datetime, time as dt_time
+from zoneinfo import ZoneInfo
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 from database import (
@@ -15,44 +16,21 @@ from database import (
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
 
-st.set_page_config(page_title="Examen ECOE Virtual - UACh", page_icon="🏥", layout="wide")
+st.set_page_config(
+    page_title="Examen ECOE Virtual - UACh", 
+    page_icon="🏥", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 
 LOGO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "logo_uach.png"))
 
 # CLAVE DE ACCESO DOCENTE
 DOCENTE_PIN = os.environ.get("DOCENTE_PIN", "uach2026")
 
-# DISEÑO EXPERTO EN DOCENCIA MÉDICA
+# DISEÑO EXPERTO EN DOCENCIA MÉDICA Y GARANTÍA DE BARRA LATERAL VISIBLE
 st.markdown("""
     <style>
-
-    /* BLOQUEO SELECTIVO DE SEGURIDAD: Ocultar GitHub, Share, Lápiz, 3 Puntos y Footer; MANTENER BOTÓN DE BARRA LATERAL */
-    [data-testid="stToolbar"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    #MainMenu {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    footer {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    /* Ocultar específicamente los íconos de GitHub, Share y Edit dentro del header */
-    header button[title*="GitHub"], 
-    header button[title*="Share"], 
-    header a[href*="github.com"], 
-    header [data-testid="stToolbarActions"],
-    header [data-testid="stAppDeployButton"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    /* Hacer transparente el header pero permitir hacer clic en la flecha de la barra lateral */
-    [data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-
     .stApp {
         background-color: #F4F1EA !important;
         color: #0F172A !important;
@@ -66,6 +44,19 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background-color: #EAE5D9 !important;
         border-right: 2px solid #D6CEBE !important;
+    }
+    
+    /* Garantizar que el botón de expandir/contraer la barra lateral SIEMPRE sea visible */
+    [data-testid="stSidebarCollapseButton"], 
+    [data-testid="stSidebarExpandButton"], 
+    button[aria-label*="sidebar"], 
+    button[aria-label*="Sidebar"],
+    [data-testid="stHeader"] button {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 999999 !important;
+        color: #1B365D !important;
     }
     
     div[data-testid="stRadio"] label {
@@ -153,6 +144,25 @@ st.markdown("""
         border: 1.5px solid #CBD5E1 !important;
         border-radius: 8px !important;
     }
+    
+    /* Ocultar únicamente íconos de GitHub/Share/Edit */
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    #MainMenu {
+        display: none !important;
+    }
+    footer {
+        display: none !important;
+    }
+    header button[title*="GitHub"], 
+    header button[title*="Share"], 
+    header a[href*="github.com"] {
+        display: none !important;
+    }
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -186,15 +196,8 @@ if "showing_survey" not in st.session_state:
     st.session_state.showing_survey = False
 if "survey_completed" not in st.session_state:
     st.session_state.survey_completed = False
-
-if "circuit_active" not in st.session_state:
-    st.session_state.circuit_active = False
-if "circuit_current_index" not in st.session_state:
-    st.session_state.circuit_current_index = 0
-if "circuit_student_name" not in st.session_state:
-    st.session_state.circuit_student_name = ""
-if "circuit_results" not in st.session_state:
-    st.session_state.circuit_results = []
+if "override_mode" not in st.session_state:
+    st.session_state.override_mode = None
 
 def render_voice_input_widget():
     st.caption("🎙️ **Control de Voz:** Puedes presionar el micrófono para hablarle al paciente o escribir abajo.")
@@ -279,22 +282,27 @@ def render_patient_tts(text_to_speak):
     """
     components.html(tts_html, height=0)
 
+# Verificación de Horario y Apertura de Examen (Ajustado a Zona Horaria de Chile America/Santiago)
 def is_exam_open_now():
     config = get_config_examen()
     if not config["examen_habilitado"]:
         return False, "El examen ha sido deshabilitado manualmente por el equipo docente."
     
     if config["modo_horario"]:
-        now = datetime.now()
+        try:
+            now = datetime.now(ZoneInfo("America/Santiago"))
+        except:
+            now = datetime.now()
+            
         current_time_str = now.strftime("%H:%M")
         
         if config["fecha_examen"]:
             current_date_str = now.strftime("%Y-%m-%d")
             if current_date_str != config["fecha_examen"]:
-                return False, f"El examen está programado únicamente para la fecha: {config['fecha_examen']}."
+                return False, f"El examen está programado únicamente para la fecha: {config['fecha_examen']} (Hora actual Chile: {now.strftime('%H:%M')})."
                 
         if current_time_str < config["hora_inicio"] or current_time_str > config["hora_fin"]:
-            return False, f"El examen solo recibe respuestas entre las {config['hora_inicio']} y las {config['hora_fin']} hrs."
+            return False, f"El examen solo recibe respuestas entre las {config['hora_inicio']} y las {config['hora_fin']} hrs (Hora actual en Chile: {current_time_str} hrs)."
             
     return True, "Abierto"
 
@@ -307,12 +315,19 @@ with st.sidebar:
     st.caption("Plataforma Oficial de Evaluación y Pacientes Virtuales")
     
     st.markdown("---")
-    role_mode = st.radio("Modo de Interfaz:", ["🎓 Modo Interno (Examen Estudiante)", "👨‍🏫 Modo Docente / Administrador"])
+    st.markdown("### 👤 Selecciona Modo de Uso:")
+    
+    default_role_idx = 0 if st.session_state.override_mode != "docente" else 1
+    role_mode = st.radio(
+        "Modo de Interfaz:", 
+        ["🎓 Modo Interno (Examen Estudiante)", "👨‍🏫 Modo Docente / Administrador"],
+        index=default_role_idx
+    )
     
     st.markdown("---")
     st.session_state.enable_tts = st.checkbox("🔊 Activar Voz Hablada del Paciente (TTS)", value=st.session_state.enable_tts)
     
-    # AUTO-CARGA SEGURA DE API KEY (INVISIBLE PARA EL ALUMNO)
+    # AUTO-CARGA SEGURA DE API KEY
     secret_key = None
     try:
         if hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
@@ -329,15 +344,22 @@ with st.sidebar:
             st.session_state.evaluator_agent = OSCEEvaluatorAgent(api_key=secret_key)
         st.caption("🟢 Servidor IA Conectado y Seguro.")
     else:
-        st.caption("🔴 Servidor IA sin conexión. Configurar en Modo Docente.")
+        st.caption("🔴 Servidor IA sin conexión.")
 
     st.markdown("---")
     st.caption("UACh - Facultad de Medicina / Internado de Cirugía")
 
+# BOTÓN DE ACCESO RÁPIDO DOCENTE EN CABECERA DE PÁGINA SI SE REPLIEGA LA BARRA
+col_top_a, col_top_b = st.columns([4, 1])
+with col_top_b:
+    if st.button("🔑 Acceso Docente (PIN)", help="Haz clic para abrir el Panel Docente"):
+        st.session_state.override_mode = "docente"
+        st.rerun()
+
 # =============================================================================
 # MODO INTERNO (EXAMEN Y PACIENTE SIMULADO)
 # =============================================================================
-if "🎓 Modo Interno" in role_mode:
+if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docente":
     c_head1, c_head2 = st.columns([1, 4])
     with c_head1:
         if os.path.exists(LOGO_PATH):
@@ -350,7 +372,7 @@ if "🎓 Modo Interno" in role_mode:
     
     if not exam_open:
         st.error(f"🔒 **RECEPCIÓN DE EXAMEN CERRADA / FUERA DE HORARIO**")
-        st.info(f"📌 **Motivo:** {open_reason}\n\nSi eres docente o evaluador, ingresa al **Modo Docente** en la barra lateral con tu clave PIN.")
+        st.info(f"📌 **Motivo:** {open_reason}\n\nSi eres docente o evaluador, presiona el botón **🔑 Acceso Docente (PIN)** arriba a la derecha.")
     else:
         exam_type = st.radio("Modalidad de Evaluación:", ["🏆 Circuito Completo de Estaciones", "🔄 Práctica de Estación Individual"], horizontal=True)
         
@@ -488,7 +510,6 @@ if "🎓 Modo Interno" in role_mode:
                                         
                                     st.rerun()
 
-            # PANTALLA DE ENCUESTA AUTOMÁTICA POST-ECOE
             elif st.session_state.showing_survey and not st.session_state.survey_completed:
                 st.balloons()
                 st.success("🎉 **¡CIRCUITO DE ESTACIONES FINALIZADO CON ÉXITO!**")
@@ -647,6 +668,7 @@ else:
     else:
         if st.button("🔒 Cerrar Sesión Docente"):
             st.session_state.docente_autenticado = False
+            st.session_state.override_mode = None
             st.rerun()
             
         t1, t2, t3, t4, t5 = st.tabs(["📊 Notas de Alumnos", "🔬 Resultados Investigación", "⏰ Control de Horario", "📚 Banco Estaciones", "➕ Crear Estación"])
@@ -707,8 +729,8 @@ else:
                 sw_estado = st.toggle("🟢 Habilitar Recepción de Examen (Abierto para alumnos)", value=cfg["examen_habilitado"])
             
             st.markdown("---")
-            st.markdown("##### 2. Ventana de Horario Automatizada (Opcional)")
-            sw_horario = st.checkbox("⏰ Activar Restricción por Horario de Inicio y Cierre", value=cfg["modo_horario"])
+            st.markdown("##### 2. Ventana de Horario Automatizada por Hora Oficial de Chile")
+            sw_horario = st.checkbox("⏰ Activar Restricción por Horario de Inicio y Cierre (Hora Oficial de Chile)", value=cfg["modo_horario"])
             
             c_h1, c_h2, c_h3 = st.columns(3)
             with c_h1:
