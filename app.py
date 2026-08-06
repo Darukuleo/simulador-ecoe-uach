@@ -11,7 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 from database import (
     init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
     get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen,
-    insert_encuesta_investigacion, get_todas_encuestas, export_all_data_json, import_all_data_json
+    insert_encuesta_investigacion, get_todas_encuestas, export_all_data_json, import_all_data_json,
+    calcular_nota_chile, append_permanent_log
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
@@ -24,6 +25,7 @@ st.set_page_config(
 )
 
 LOGO_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "logo_uach.png"))
+PERMANENT_LOG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "registros_permanentes.json"))
 
 # CLAVE DE ACCESO DOCENTE
 DOCENTE_PIN = os.environ.get("DOCENTE_PIN", "uach2026")
@@ -265,7 +267,7 @@ def render_voice_input_widget():
     components.html(voice_html, height=75)
 
 def render_patient_tts(text_to_speak):
-    clean_text = json.dumps(text_to_speak.replace('"', '\"'))
+    clean_text = json.dumps(text_to_speak)
     tts_html = f"""
     <script>
         if ('speechSynthesis' in window) {{
@@ -379,7 +381,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
         # --- MODALIDAD A: CIRCUITO COMPLETO DE ESTACIONES ---
         if "Circuito Completo" in exam_type:
             if not st.session_state.get("circuit_active", False) and not bool(st.session_state.get("circuit_results", [])) and not st.session_state.get("showing_inter_station_feedback", False) and not st.session_state.get("showing_survey", False):
-                st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar el circuito completo, responderás una breve Encuesta de Investigación Médica.")
+                st.info("📌 **Bienvenido al Examen ECOE.** Realizarás las estaciones clínicas consecutivas (7 minutos por estación). Al finalizar el circuito completo, recibirás tu **Informe Oficial de Notas (1.0 a 7.0)** y responderás una breve Encuesta de Investigación Médica.")
                 
                 c_name, c_btn = st.columns([3, 1])
                 with c_name:
@@ -403,10 +405,11 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
             elif st.session_state.showing_inter_station_feedback:
                 st.success("✅ **¡Estación Completada!**")
                 fb_item = st.session_state.last_station_feedback
-                st.subheader(f"💡 Resumen Breve de Evaluación: {fb_item['estacion']}")
+                nota_st = calcular_nota_chile(fb_item['porcentaje'])
                 
+                st.subheader(f"💡 Resumen Breve de Evaluación: {fb_item['estacion']}")
+                st.write(f"Calificación Obtenida en esta Estación: **Nota {nota_st:.1f}** ({fb_item['porcentaje']:.1f}%)")
                 st.info(f"**Observaciones del Evaluador:**\n\n{fb_item['feedback']}")
-                st.write(f"Rendimiento en esta estación: **{fb_item['porcentaje']:.1f}%**")
                 
                 st.markdown("---")
                 if st.button("➡️ Avanzar Inmediatamente a la Siguiente Estación ➔", type="primary"):
@@ -441,10 +444,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
 
                     st.progress((idx + 1) / total_st)
                     
-                    st.info(f"📋 **HOJA DE INSTRUCCIONES PARA EL INTERNO (DOOR SHEET):**\n\n" +
-                            f"* **Ubicación / Contexto:** {gt_data.get('motivo_consulta')}\n" +
-                            f"* **Paciente:** {gt_data.get('paciente_nombre')}, {gt_data.get('edad', '50')} años.\n" +
-                            f"* **Tareas:** Realice la anamnesis focalizada, indique si examina al paciente o solicite los exámenes de laboratorio/imágenes necesarios. Indique su manejo táctico inicial.")
+                    st.info(f"📋 **HOJA DE INSTRUCCIONES PARA EL INTERNO (DOOR SHEET):**\n\n* **Ubicación / Contexto:** {gt_data.get('motivo_consulta')}\n* **Paciente:** {gt_data.get('paciente_nombre')}, {gt_data.get('edad', '50')} años.\n* **Tareas:** Realice la anamnesis focalizada, indique si examina al paciente o solicite los exámenes de laboratorio/imágenes necesarios. Indique su manejo táctico inicial.")
                     
                     for msg in st.session_state.chat_history:
                         with st.chat_message(msg["role"]):
@@ -487,10 +487,22 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                                         p_conducta=eval_rep["score_clinical_management"],
                                         feedback=eval_rep["qualitative_feedback"]
                                     )
+                                    
+                                    # REGISTRO PERMANENTE DE SEGURIDAD
+                                    append_permanent_log("evaluacion", {
+                                        "alumno": st.session_state.circuit_student_name,
+                                        "estacion": f"Estación N° {idx+1}",
+                                        "codigo": current_caso["codigo_estacion"],
+                                        "porcentaje": eval_rep["total_score_percentage"],
+                                        "nota": calcular_nota_chile(eval_rep["total_score_percentage"]),
+                                        "feedback": eval_rep["qualitative_feedback"]
+                                    })
+                                    
                                     fb_entry = {
                                         "estacion": f"Estación N° {idx+1}",
                                         "especialidad": current_caso["especialidad"],
                                         "porcentaje": eval_rep["total_score_percentage"],
+                                        "nota": calcular_nota_chile(eval_rep["total_score_percentage"]),
                                         "feedback": eval_rep["qualitative_feedback"]
                                     }
                                     st.session_state.circuit_results.append(fb_entry)
@@ -508,6 +520,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                                         
                                     st.rerun()
 
+            # PANTALLA DE ENCUESTA AUTOMÁTICA POST-ECOE
             elif st.session_state.showing_survey and not st.session_state.survey_completed:
                 st.balloons()
                 st.success("🎉 **¡CIRCUITO DE ESTACIONES FINALIZADO CON ÉXITO!**")
@@ -546,27 +559,46 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     q2 = st.text_area("2. ¿Qué limitaciones o aspectos a mejorar identificó durante las estaciones?", value="")
                     q3 = st.text_area("3. En comparación con un ECOE tradicional con actores humanos, ¿qué ventajas/desventajas percibe?", value="")
                     
-                    btn_survey = st.form_submit_button("💾 Guardar Encuesta y Finalizar Examen ECOE", type="primary")
+                    btn_survey = st.form_submit_button("💾 Guardar Encuesta y Ver Mi Certificado de Notas ➔", type="primary")
                     if btn_survey:
                         likert_dict = {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "U1": u1, "U2": u2, "U3": u3, "U4": u4, "P1": p1, "P2": p2, "P3": p3, "P4": p4, "V1": v1, "V2": v2}
                         qual_dict = {"Q1": q1.strip(), "Q2": q2.strip(), "Q3": q3.strip()}
                         insert_encuesta_investigacion(st.session_state.circuit_student_name, likert_dict, qual_dict)
+                        
+                        append_permanent_log("encuesta", {
+                            "alumno": st.session_state.circuit_student_name,
+                            "likert": likert_dict,
+                            "cualitativa": qual_dict
+                        })
+                        
                         st.session_state.survey_completed = True
                         st.session_state.showing_survey = False
                         st.rerun()
 
             elif st.session_state.circuit_results and not st.session_state.circuit_active and not st.session_state.showing_inter_station_feedback:
                 st.balloons()
-                st.success(f"🎉 **¡EXAMEN ECOE Y ENCUESTA FINALIZADOS!**")
-                st.subheader(f"📜 Confirmación de Entrega de Examen - {st.session_state.circuit_student_name}")
+                st.success(f"🎓 **¡INFORMES Y CERTIFICADO OFICIAL DE NOTAS ECOE UACh!**")
+                st.subheader(f"📜 Informe de Calificaciones - Alumno/a: {st.session_state.circuit_student_name}")
                 
                 res = st.session_state.circuit_results
-                st.info("✅ **Tus respuestas, evaluaciones y encuesta han sido registradas de forma segura en el sistema.** El equipo docente revisará tu calificación final.")
+                pct_prom = sum(r["porcentaje"] for r in res) / len(res) if res else 0.0
+                nota_global = calcular_nota_chile(pct_prom)
                 
-                k1, k2 = st.columns(2)
-                k1.metric("Estaciones Rendidas", f"{len(res)} / {len(casos)}")
-                k2.metric("Estado de Respuestas y Encuesta", "REGISTRADAS Y GUARDADAS")
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Nota Final Global Examen (1.0 - 7.0)", f"Nota {nota_global:.1f}")
+                k2.metric("Puntaje Global Cumplido", f"{pct_prom:.1f}%")
+                k3.metric("Estado Final Examen", "🟢 APROBADO" if nota_global >= 4.0 else "🔴 REPROBADO")
                 
+                st.markdown("---")
+                st.markdown("### 📋 Desglose de Calificaciones por Estación:")
+                
+                for idx, r in enumerate(res, 1):
+                    n_st = r.get("nota", calcular_nota_chile(r["porcentaje"]))
+                    badge = "🟢 APROBADO" if n_st >= 4.0 else "🔴 REPROBADO"
+                    with st.expander(f"📌 {r['estacion']} | NOTA: {n_st:.1f} ({r['porcentaje']:.1f}%) | Status: {badge}"):
+                        st.info(f"**Observaciones Docentes:**\n\n{r['feedback']}")
+                
+                st.markdown("---")
                 if st.button("🔄 Rendir Nuevo Examen"):
                     st.session_state.circuit_active = False
                     st.session_state.circuit_current_index = 0
@@ -593,10 +625,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     st.session_state.last_evaluation = None
                     st.rerun()
                     
-            st.info(f"📋 **HOJA DEL ALUMNO (DOOR SHEET):**\n\n" +
-                    f"* **Motivo de Consulta:** {gt.get('motivo_consulta')}\n" +
-                    f"* **Paciente:** {gt.get('paciente_nombre')}, {gt.get('edad', '50')} años.\n" +
-                    f"* **Tareas:** Realiza la anamnesis, examen físico o pide exámenes. Cuentas con 7 minutos.")
+            st.info(f"📋 **HOJA DEL ALUMNO (DOOR SHEET):**\n\n* **Motivo de Consulta:** {gt.get('motivo_consulta')}\n* **Paciente:** {gt.get('paciente_nombre')}, {gt.get('edad', '50')} años.\n* **Tareas:** Realiza la anamnesis, examen físico o pide exámenes. Cuentas con 7 minutos.")
 
             for msg in st.session_state.chat_history:
                 with st.chat_message(msg["role"]):
@@ -639,7 +668,10 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                                 p_conducta=report["score_clinical_management"],
                                 feedback=report["qualitative_feedback"]
                             )
-                            st.success("🎉 ¡Evaluación completada!")
+                            
+                            n_ind = calcular_nota_chile(report["total_score_percentage"])
+                            st.success(f"🎉 ¡Evaluación completada! Obuviste **Nota {n_ind:.1f}** ({report['total_score_percentage']:.1f}%)")
+                            st.info(f"**Feedback Docente:** {report['qualitative_feedback']}")
 
 # =============================================================================
 # MODO DOCENTE / ADMINISTRADOR (PROTEGIDO POR CONTRASEÑA/PIN)
@@ -669,7 +701,14 @@ else:
             st.session_state.override_mode = None
             st.rerun()
             
-        t1, t2, t3, t4, t5 = st.tabs(["📊 Notas de Alumnos", "🔬 Resultados Investigación", "⏰ Control de Horario", "📚 Banco Estaciones", "➕ Crear Estación"])
+        t1, t2, t3, t4, t5, t6 = st.tabs([
+            "📊 Notas de Alumnos", 
+            "🔬 Resultados Investigación", 
+            "💾 Respaldos Permanentes", 
+            "⏰ Control de Horario", 
+            "📚 Banco Estaciones", 
+            "➕ Crear Estación"
+        ])
         
         with t1:
             st.subheader("📊 Histórico de Evaluaciones y Calificaciones de Alumnos")
@@ -691,20 +730,22 @@ else:
                     if import_all_data_json(content_str):
                         st.success("🎉 Backup restaurado con éxito.")
                         st.rerun()
+                        
+            st.markdown("---")
             evals = get_todas_evaluaciones()
             
             if evals:
                 st.write(f"Total de Sesiones Evaluadas: **{len(evals)}**")
                 for ev_item in evals:
                     pct = ev_item["puntaje_global"]
-                    nota = (4.0 + 3.0 * ((pct - 60.0) / 40.0)) if pct >= 60.0 else (1.0 + 3.0 * (pct / 60.0))
+                    nota = calcular_nota_chile(pct)
                     
                     with st.expander(f"👤 Alumno: {ev_item['alumno_nombre']} | [{ev_item['codigo_estacion']}] {ev_item['titulo']} | NOTA: {nota:.1f} ({pct:.1f}%)"):
                         st.write(f"**Fecha y Hora:** {ev_item['fecha_sesion']}")
                         st.write(f"**Desglose Puntajes:** Anamnesis {ev_item.get('puntaje_anamnesis', 15)}/20 | Examen Físico {ev_item.get('puntaje_examen_fisico', 15)}/20 | Exámenes {ev_item.get('puntaje_examenes', 15)}/20 | Diagnóstico {ev_item.get('puntaje_diagnostico', 15)}/20 | Conducta {ev_item.get('puntaje_conducta', 15)}/20")
                         st.info(f"**Feedback Docente:** {ev_item['feedback_docente']}")
             else:
-                st.info("Aún no hay evaluaciones registradas en la base de datos.")
+                st.info("Aún no hay evaluaciones registradas en la base de datos local.")
 
         with t2:
             st.subheader("🔬 Resultados y Datos de Investigación Médica (Encuestas Post-ECOE)")
@@ -733,9 +774,32 @@ else:
                         st.write(f"**Aspectos a mejorar:** {q_dict.get('Q2', 'Sin respuesta')}")
                         st.write(f"**Comparación con ECOE tradicional:** {q_dict.get('Q3', 'Sin respuesta')}")
             else:
-                st.info("Aún no hay encuestas registradas. Aparecerán automáticamente cuando los internos completen el examen.")
+                st.info("Aún no hay encuestas registradas en la base de datos local.")
 
         with t3:
+            st.subheader("💾 Registros de Seguridad Anti-Pérdida (Bitácora de Servidor)")
+            st.caption("Esta sección guarda un respaldo histórico redundante en disco para que ningún examen se pierda tras reinicios de la nube.")
+            
+            if os.path.exists(PERMANENT_LOG_PATH):
+                try:
+                    with open(PERMANENT_LOG_PATH, "r", encoding="utf-8") as f:
+                        perm_records = json.load(f)
+                    
+                    st.write(f"Total de Registros Guardados en Bitácora: **{len(perm_records)}**")
+                    st.download_button(
+                        label="📥 Descargar Bitácora Histórica Completa (JSON)",
+                        data=json.dumps(perm_records, ensure_ascii=False, indent=2),
+                        file_name="bitacora_permanente_ecoe.json",
+                        mime="application/json"
+                    )
+                    
+                    st.json(perm_records)
+                except Exception as ex_log:
+                    st.error(f"Error al leer la bitácora: {ex_log}")
+            else:
+                st.info("Aún no se han generado registros en la bitácora permanente de disco.")
+
+        with t4:
             st.subheader("⏰ Control de Recepción y Horario del Examen")
             cfg = get_config_examen()
             
@@ -761,7 +825,7 @@ else:
                 st.success("🎉 Configuración de horario actualizada correctamente.")
                 st.rerun()
 
-        with t4:
+        with t5:
             st.subheader("⚙️ Banco de Estaciones ECOE en SQLite")
             casos = get_casos_ecoe()
             st.write(f"Total de Estaciones Activas: **{len(casos)}**")
@@ -775,7 +839,7 @@ else:
                     st.markdown(f"**Diagnóstico Indiscutible:** {gt.get('diagnostico_correcto')}")
                     st.markdown(f"**Conducta Esperada:** {gt.get('conducta_correcta')}")
                     
-        with t5:
+        with t6:
             st.subheader("➕ Agregar Nueva Estación ECOE al Banco")
             
             with st.form("form_nuevo_caso"):
