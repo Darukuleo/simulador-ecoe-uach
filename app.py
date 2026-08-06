@@ -466,8 +466,8 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                         if st.button("🧪 Solicitar Exámenes"):
                             quick_action = "Solicito exámenes de laboratorio (Hemograma, PCR, Perfil bioquímico, Pruebas de coagulación y Función renal)."
                     with c_act4:
-                        if st.button("📸 Solicitar TAC / Rx"):
-                            quick_action = "Solicito TAC de abdomen y pelvis con contraste (o Radiografía según corresponda)."
+                        if st.button("📸 Solicitar Imágenes (Eco/TAC/Rx)"):
+                            quick_action = "Solicito estudio de imágenes pertinentes (Ecografía, TAC o Radiografía según corresponda al caso)."
 
                     user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
                     if quick_action:
