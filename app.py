@@ -452,7 +452,26 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
 
                     render_voice_input_widget()
 
+                    # BOTONES DE ACCIÓN CLÍNICA RÁPIDA (1-CLIC)
+                    st.caption("⚡ **Acciones Clínicas Rápidas (Haz clic para ejecutar directamente):**")
+                    c_act1, c_act2, c_act3, c_act4 = st.columns(4)
+                    quick_action = None
+                    with c_act1:
+                        if st.button("🩺 Signos Vitales"):
+                            quick_action = "Le tomo los signos vitales (Presión arterial, Frecuencia cardíaca, Temperatura, Frecuencia respiratoria y Saturación)."
+                    with c_act2:
+                        if st.button("🔍 Examinar Abdomen"):
+                            quick_action = "Le realizo el examen físico abdominal completo (Inspección, Auscultación, Palpación superficial y profunda, y Percusión)."
+                    with c_act3:
+                        if st.button("🧪 Solicitar Exámenes"):
+                            quick_action = "Solicito exámenes de laboratorio (Hemograma, PCR, Perfil bioquímico, Pruebas de coagulación y Función renal)."
+                    with c_act4:
+                        if st.button("📸 Solicitar TAC / Rx"):
+                            quick_action = "Solicito TAC de abdomen y pelvis con contraste (o Radiografía según corresponda)."
+
                     user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
+                    if quick_action:
+                        user_input = quick_action
                     if user_input:
                         if not st.session_state.patient_agent:
                             st.error("⚠️ Ingrese su API Key en la barra lateral para conversar.")
