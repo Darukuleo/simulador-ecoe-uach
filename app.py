@@ -16,6 +16,7 @@ from database import (
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
+from agents.diagnostic_tutor_agent import DiagnosticTutorAgent
 
 st.set_page_config(
     page_title="Examen ECOE Virtual - UACh", 
@@ -448,11 +449,32 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                         remaining = max(0, 420 - int(elapsed))
                         mins, secs = divmod(remaining, 60)
                         
+                        timer_color = "#DC2626" if remaining <= 60 else "#1B365D"
+                        timer_bg = "#FEE2E2" if remaining <= 60 else "#E2E8F0"
+                        
+                        # CRONÓMETRO FLOTANTE / STICKY SIEMPRE VISIBLE AL HACER SCROLL
+                        st.markdown(f"""
+                        <div style="
+                            position: fixed;
+                            top: 15px;
+                            right: 25px;
+                            z-index: 999999;
+                            background-color: {timer_bg};
+                            color: {timer_color};
+                            border: 2.5px solid {timer_color};
+                            padding: 8px 18px;
+                            border-radius: 25px;
+                            font-weight: 800;
+                            font-size: 1.3rem;
+                            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+                            backdrop-filter: blur(8px);
+                        ">
+                            ⏱️ {mins:02d}:{secs:02d}
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
                         if remaining <= 60 and remaining > 0:
-                            st.markdown(f"<h2 style='color: #DC2626; text-align: center;'>⏱️ {mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True)
                             st.error("⚠️ ¡Queda 1 minuto para finalizar la estación!")
-                        else:
-                            st.markdown(f"<h2 style='color: #1B365D; text-align: center;'>⏱️ {mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True)
 
                     st.progress((idx + 1) / total_st)
                     
@@ -464,20 +486,9 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
 
                     render_voice_input_widget()
 
-                    # ACCIONES RÁPIDAS DE EXAMEN FÍSICO NEUTRO (SIN SUGERIR EXÁMENES DE LABORATORIO NI IMÁGENES)
-                    st.caption("⚡ **Acciones Rápidas de Examen Físico:**")
-                    c_act1, c_act2 = st.columns(2)
-                    quick_action = None
-                    with c_act1:
-                        if st.button("🩺 Control de Signos Vitales"):
-                            quick_action = "Le tomo los signos vitales completos."
-                    with c_act2:
-                        if st.button("🔍 Examen Físico Segmentario"):
-                            quick_action = "Le realizo el examen físico segmentario dirigido."
+
 
                     user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
-                    if quick_action:
-                        user_input = quick_action
                     if user_input:
                         if not st.session_state.patient_agent:
                             st.error("⚠️ Ingrese su API Key en la barra lateral para conversar.")
