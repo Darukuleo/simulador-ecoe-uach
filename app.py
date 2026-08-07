@@ -16,7 +16,6 @@ from database import (
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
-from agents.diagnostic_tutor_agent import DiagnosticTutorAgent
 
 st.set_page_config(
     page_title="Examen ECOE Virtual - UACh", 
