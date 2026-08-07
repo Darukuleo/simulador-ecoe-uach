@@ -6,7 +6,7 @@ from google import genai
 class StandardizedPatientAgent:
     """
     Agente Paciente Simulado Estandarizado (ECOE/OSCE).
-    Responde en primera persona al interno de medicina de forma clínicamente coherente y realista.
+    Responde en primera persona al interno de medicina de forma clínicamente coherente, realista y detallada.
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
@@ -36,10 +36,11 @@ class StandardizedPatientAgent:
 
         REGLAS DE ACTUACIÓN:
         1. Habla en primera persona, como un paciente real en la consulta médica.
-        2. No uses lenguaje médico técnico avanzado a menos que el paciente lo sepa por su antecedente.
-        3. Revela solo la información que el estudiante pregunte específicamente en la anamnesis.
-        4. Si el estudiante dice que va a realizar un examen físico o solicita un laboratorio/TAC, proporciónale de forma objetiva los hallazgos descritos en el secreto del caso.
-        5. Mantén la coherencia emocional (preocupación, dolor o ansiedad moderada).
+        2. Proporciona respuestas naturales, expresivas y clínicamente completas. Expresa tus inquietudes, temor o dolor con realismo.
+        3. No uses lenguaje médico técnico avanzado a menos que el paciente lo sepa por su antecedente.
+        4. Revela de forma fluida y colaborativa la información que el estudiante pregunte en la anamnesis.
+        5. Si el estudiante dice que va a realizar un examen físico o solicita un laboratorio/TAC, proporciónale de forma objetiva y detallada los hallazgos descritos en el secreto del caso.
+        6. Mantén la coherencia emocional adecuada a la patología.
 
         HISTORIAL DE LA CONSULTA HASTA AHORA:
         {json.dumps(chat_history[-6:], ensure_ascii=False, indent=2)}
@@ -54,11 +55,9 @@ class StandardizedPatientAgent:
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
-                    from google.genai import types
                     response = self.client.models.generate_content(
                         model=model,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(max_output_tokens=120, temperature=0.2)
+                        contents=prompt
                     )
                     if response and response.text:
                         return response.text.strip()
@@ -66,20 +65,4 @@ class StandardizedPatientAgent:
                     last_error = str(e)
                     time.sleep(0.5)
                     
-        return f"Doctor(a), me siento muy mal por mi dolor. Disculpe, ¿me podría repetir lo que dijo? (Reintento automático por congestión de servidor)."
-
-    def generate_audio_speech(self, text: str, output_path: str = "data/outputs/patient_voice.mp3") -> str:
-        """
-        Sintetiza la respuesta hablada del paciente virtual en un archivo de audio MP3 (gTTS).
-        """
-        try:
-            from gtts import gTTS
-            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-            # Limpiar texto de marcadores markdown
-            clean_text = text.replace("*", "").replace("#", "").replace("`", "").strip()
-            tts = gTTS(text=clean_text, lang='es', slow=False)
-            tts.save(output_path)
-            return output_path
-        except Exception as e:
-            print(f"Error sintetizando voz del paciente: {e}")
-            return ""
+        return f"Doctor(a), me siento mal por mi dolencia. Disculpe, ¿me podría repetir lo que me dijo?"
