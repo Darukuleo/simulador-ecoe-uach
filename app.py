@@ -16,6 +16,7 @@ from database import (
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
+from agents.voice_realism_studio import VoiceRealismStudio
 from agents.diagnostic_tutor_agent import DiagnosticTutorAgent
 
 st.set_page_config(
@@ -279,16 +280,35 @@ def render_voice_input_widget():
     """
     components.html(voice_html, height=75)
 
-def render_patient_tts(text_to_speak):
-    clean_text = json.dumps(text_to_speak)
+def render_patient_tts(text_to_speak, emotion_mode="🔴 Dolor Agudo / Agitado"):
+    rate = 1.0
+    pitch = 1.0
+    prefix = ""
+    
+    if "Dolor Agudo" in emotion_mode:
+        rate = 0.85
+        pitch = 1.15
+        prefix = "Ay... uff... "
+    elif "Anciano" in emotion_mode:
+        rate = 0.75
+        pitch = 0.85
+        prefix = "Mire doctor... "
+    elif "Ansioso" in emotion_mode:
+        rate = 1.2
+        pitch = 1.25
+        prefix = "¡Doctor, por favor! "
+        
+    full_text = prefix + text_to_speak if prefix and not text_to_speak.startswith(prefix.strip()) else text_to_speak
+    clean_text = json.dumps(full_text)
+    
     tts_html = f"""
     <script>
         if ('speechSynthesis' in window) {{
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance({clean_text});
             utterance.lang = 'es-CL';
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
+            utterance.rate = {rate};
+            utterance.pitch = {pitch};
             window.speechSynthesis.speak(utterance);
         }}
     </script>
@@ -339,6 +359,14 @@ with st.sidebar:
     
     st.markdown("---")
     st.session_state.enable_tts = st.checkbox("🔊 Activar Voz Hablada del Paciente (TTS)", value=st.session_state.enable_tts)
+    if st.session_state.enable_tts:
+        st.session_state.patient_emotion = st.selectbox(
+            "🎭 Perfil Emocional del Paciente (ECOE-Voice-Realism):",
+            ["🔴 Dolor Agudo / Agitado", "👴 Anciano / Pausado", "😰 Ansioso / Shock Inicial", "🟢 Tranquilo / Colaborativo"],
+            index=0
+        )
+    else:
+        st.session_state.patient_emotion = "🟢 Tranquilo / Colaborativo"
     
     # AUTO-CARGA SEGURA DE API KEY
     secret_key = None
@@ -499,7 +527,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                                 st.session_state.chat_history.append({"role": "assistant", "content": resp})
                                 
                                 if st.session_state.enable_tts:
-                                    render_patient_tts(resp)
+                                    render_patient_tts(resp, st.session_state.get('patient_emotion', '🔴 Dolor Agudo / Agitado'))
                                     
                                 st.rerun()
 
@@ -680,7 +708,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                         st.session_state.chat_history.append({"role": "assistant", "content": r_text})
                         
                         if st.session_state.enable_tts:
-                            render_patient_tts(r_text)
+                            render_patient_tts(r_text, st.session_state.get('patient_emotion', '🔴 Dolor Agudo / Agitado'))
                             
                         st.rerun()
 
