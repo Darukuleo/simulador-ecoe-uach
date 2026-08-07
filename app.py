@@ -239,13 +239,25 @@ def render_voice_input_widget():
             
             recognition.onresult = function(event) {
                 const transcript = event.results[0][0].transcript;
-                statusTxt.innerText = 'Transcrito: "' + transcript + '"';
+                statusTxt.innerText = 'Enviando voz: "' + transcript + '"...';
                 
                 const chatInput = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
                 if (chatInput) {
-                    chatInput.value = transcript;
+                    // Seteo nativo para activar el estado de React en Streamlit
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                    nativeInputValueSetter.call(chatInput, transcript);
                     chatInput.dispatchEvent(new Event('input', { bubbles: true }));
                     chatInput.focus();
+                    
+                    // Simular envío automático (Enter)
+                    setTimeout(() => {
+                        const sendBtn = window.parent.document.querySelector('button[data-testid="stChatInputSubmitButton"]');
+                        if (sendBtn) {
+                            sendBtn.click();
+                        } else {
+                            chatInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, keyCode: 13, key: 'Enter' }));
+                        }
+                    }, 300);
                 }
                 
                 btn.style.backgroundColor = '#DC2626';

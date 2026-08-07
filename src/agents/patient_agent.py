@@ -10,8 +10,16 @@ class StandardizedPatientAgent:
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=self.api_key)
+        self._client = None
         self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+
+    @property
+    def client(self):
+        if self._client is None:
+            self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY")
+            if self.api_key:
+                self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def respond_to_student(self, ground_truth: dict, chat_history: list, user_message: str) -> str:
         prompt = f"""
@@ -46,9 +54,11 @@ class StandardizedPatientAgent:
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
+                    from google.genai import types
                     response = self.client.models.generate_content(
                         model=model,
-                        contents=prompt
+                        contents=prompt,
+                        config=types.GenerateContentConfig(max_output_tokens=120, temperature=0.2)
                     )
                     if response and response.text:
                         return response.text.strip()
@@ -57,3 +67,19 @@ class StandardizedPatientAgent:
                     time.sleep(0.5)
                     
         return f"Doctor(a), me siento muy mal por mi dolor. Disculpe, ¿me podría repetir lo que dijo? (Reintento automático por congestión de servidor)."
+
+    def generate_audio_speech(self, text: str, output_path: str = "data/outputs/patient_voice.mp3") -> str:
+        """
+        Sintetiza la respuesta hablada del paciente virtual en un archivo de audio MP3 (gTTS).
+        """
+        try:
+            from gtts import gTTS
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+            # Limpiar texto de marcadores markdown
+            clean_text = text.replace("*", "").replace("#", "").replace("`", "").strip()
+            tts = gTTS(text=clean_text, lang='es', slow=False)
+            tts.save(output_path)
+            return output_path
+        except Exception as e:
+            print(f"Error sintetizando voz del paciente: {e}")
+            return ""

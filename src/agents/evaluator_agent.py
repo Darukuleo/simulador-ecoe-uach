@@ -21,8 +21,16 @@ class OSCEEvaluatorAgent:
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=self.api_key)
+        self._client = None
         self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+
+    @property
+    def client(self):
+        if self._client is None:
+            self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY")
+            if self.api_key:
+                self._client = genai.Client(api_key=self.api_key)
+        return self._client
 
     def evaluate_simulation(self, ground_truth: dict, chat_history: list) -> dict:
         prompt = f"""
