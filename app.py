@@ -1,3 +1,9 @@
+import os
+import sys
+
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "src"))
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 import streamlit as st
 import streamlit.components.v1 as components
 import os
@@ -7,7 +13,6 @@ import time
 from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 from database import (
     init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
     get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen,
@@ -16,7 +21,11 @@ from database import (
 )
 from agents.patient_agent import StandardizedPatientAgent
 from agents.evaluator_agent import OSCEEvaluatorAgent
-from agents.voice_realism_studio import VoiceRealismStudio
+try:
+    from agents.voice_realism_studio import VoiceRealismStudio
+except Exception:
+    class VoiceRealismStudio:
+        EMOTION_PROFILES = {}
 from agents.diagnostic_tutor_agent import DiagnosticTutorAgent
 
 st.set_page_config(
