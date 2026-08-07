@@ -1,3 +1,4 @@
+from datetime import datetime
 import sqlite3
 import os
 import json
@@ -285,22 +286,22 @@ def calcular_nota_chile(porcentaje: float) -> float:
 
 def append_permanent_log(record_type: str, data: dict):
     """Guarda un respaldo permanente en un archivo JSON en disco para evitar pérdida en la nube."""
-    log_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "registros_permanentes.json"))
-    records = []
-    if os.path.exists(log_file):
-        try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                records = json.load(f)
-        except:
-            records = []
-            
-    records.append({
-        "tipo": record_type,
-        "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "datos": data
-    })
-    
     try:
+        log_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "registros_permanentes.json"))
+        records = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, "r", encoding="utf-8") as f:
+                    records = json.load(f)
+            except:
+                records = []
+                
+        records.append({
+            "tipo": record_type,
+            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "datos": data
+        })
+        
         with open(log_file, "w", encoding="utf-8") as f:
             json.dump(records, f, ensure_ascii=False, indent=2)
     except Exception as e:
