@@ -531,14 +531,18 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                             st.error("⚠️ Ingrese su API Key en la barra lateral para conversar.")
                         else:
                             st.session_state.chat_history.append({"role": "user", "content": user_input})
-                            with st.spinner("El paciente está respondiendo..."):
-                                resp = st.session_state.patient_agent.respond_to_student(gt_data, st.session_state.chat_history, user_input)
-                                st.session_state.chat_history.append({"role": "assistant", "content": resp})
+                            
+                            with st.chat_message("user"):
+                                st.markdown(user_input)
                                 
-                                if st.session_state.enable_tts:
-                                    render_patient_tts(resp, st.session_state.get('patient_emotion', '🔴 Dolor Agudo / Agitado'))
-                                    
-                                st.rerun()
+                            with st.chat_message("assistant"):
+                                stream = st.session_state.patient_agent.respond_to_student_stream(gt_data, st.session_state.chat_history, user_input)
+                                resp = st.write_stream(stream)
+                                
+                            st.session_state.chat_history.append({"role": "assistant", "content": resp})
+                            
+                            if st.session_state.enable_tts:
+                                render_patient_tts(resp, st.session_state.get('patient_emotion', '🔴 Dolor Agudo / Agitado'))
 
                     st.markdown("---")
                     col_b1, col_b2 = st.columns([2, 1])

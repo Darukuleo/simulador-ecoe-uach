@@ -7,11 +7,18 @@ class StandardizedPatientAgent:
     """
     Agente Paciente Simulado Estandarizado (ECOE/OSCE).
     Responde en primera persona al interno de medicina de forma clínicamente coherente, realista y detallada.
+    OPTIMIZADO PARA VELOCIDAD (Gemini Flash) Y RESPUESTAS CORTAS.
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
-        self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+        # Solo usamos FLASH para garantizar latencia mínima en chat en vivo
+        import sys
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        if root_dir not in sys.path:
+            sys.path.append(root_dir)
+        from antigravity_config import AntigravityConfig
+        self.fallback_models = AntigravityConfig.FALLBACK_FLASH_MODELS
 
     @property
     def client(self):
@@ -22,6 +29,47 @@ class StandardizedPatientAgent:
         return self._client
 
     def respond_to_student(self, ground_truth: dict, chat_history: list, user_message: str) -> str:
+        prompt = f"""
+        Eres un Paciente Estandarizado en una Estación de Examen Clínico Objetivo Estructurado (ECOE).
+        Estás siendo atendido por un interno de medicina.
+
+        INFORMACIÓN SECRETA DE TU CASO (GROUND TRUTH):
+        - Nombre y Edad: {ground_truth.get('paciente_nombre', 'Juan Pérez')}, {ground_truth.get('edad', '55')} años.
+        - Motivo de Consulta Real: {ground_truth.get('motivo_consulta', 'Dolor abdominal')}
+        - Historia de la Enfermedad Actual: {ground_truth.get('historia_clinica', '')}
+        - Antecedentes Médicos y Quirúrgicos: {ground_truth.get('antecedentes', '')}
+        - Hallazgos al Examen Físico: {ground_truth.get('examen_fisico', '')}
+
+        REGLAS DE ACTUACIÓN (MUY ESTRICTAS):
+        1. RESTRICCIÓN FÍSICA: Si tu condición es grave (ej. dolor agudo, shock), tus respuestas DEBEN ser cortadas, con quejidos o desorientadas.
+        2. OCULTAMIENTO ACTIVO: JAMÁS reveles un síntoma clave o un antecedente si el médico no te pregunta específicamente por ello. Gánate la información.
+        3. SI TE EXAMINAN: Si el alumno escribe explícitamente "Voy a examinar su abdomen" o similar, revélale de forma narrativa lo que siente (ej. "¡Ay, me dolió mucho cuando soltó la mano!").
+        4. LONGITUD: Tus respuestas DEBEN ser MUY CORTAS. Máximo 2 o 3 oraciones cortas. (Para acelerar el tiempo de síntesis de voz).
+
+        HISTORIAL RECIENTE:
+        {json.dumps(chat_history[-6:], ensure_ascii=False, indent=2)}
+
+        MÉDICO:
+        "{user_message}"
+
+        Responde como el paciente (recuerda: conciso y actuando tu estado físico):
+        """
+        
+        for model in self.fallback_models:
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                time.sleep(0.5)
+                continue
+                
+        return f"Doctor(a), me siento mal. Disculpe, ¿me podría repetir lo que me dijo?"
+
+    def respond_to_student_stream(self, ground_truth: dict, chat_history: list, user_message: str):
         prompt = f"""
         Eres un Paciente Estandarizado en una Estación de Examen Clínico Objetivo Estructurado (ECOE).
         Estás siendo atendido por un interno de medicina.
@@ -51,18 +99,19 @@ class StandardizedPatientAgent:
         Responde como el paciente:
         """
         
-        last_error = ""
+        import time
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
-                    response = self.client.models.generate_content(
+                    response = self.client.models.generate_content_stream(
                         model=model,
                         contents=prompt
                     )
-                    if response and response.text:
-                        return response.text.strip()
+                    for chunk in response:
+                        if chunk.text:
+                            yield chunk.text
+                    return
                 except Exception as e:
-                    last_error = str(e)
                     time.sleep(0.5)
                     
-        return f"Doctor(a), me siento mal por mi dolencia. Disculpe, ¿me podría repetir lo que me dijo?"
+        yield f"Doctor(a), me siento mal por mi dolencia. Disculpe, ¿me podría repetir lo que me dijo?"

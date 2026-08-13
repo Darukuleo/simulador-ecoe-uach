@@ -12,17 +12,25 @@ class OSCEEvaluationReport(BaseModel):
     score_diagnosis_accuracy: float = Field(description="Puntaje de Precisión Diagnóstica (0 a 20)")
     score_clinical_management: float = Field(description="Puntaje de Conducta Táctica y Manejo (0 a 20)")
     total_score_percentage: float = Field(description="Puntaje Total Global (0 a 100%)")
-    qualitative_feedback: str = Field(description="Feedback pedagógico detallado con aciertos, omisiones críticas y recomendación docente UACh")
+    critical_errors_missed: list[str] = Field(description="Lista de RED FLAGS o errores críticos que el alumno cometió (ej. no preguntar alergias, obviar un signo vital de shock)")
+    clinical_reasoning_assessment: str = Field(description="Evaluación cualitativa del razonamiento clínico. ¿Por qué falló o acertó?")
+    qualitative_feedback: str = Field(description="Feedback pedagógico detallado con aciertos, omisiones críticas y recomendación docente UACh final")
 
 class OSCEEvaluatorAgent:
     """
     Agente Tutor / Evaluador Docente UACh de Estaciones ECOE/OSCE.
-    Audita la transcripción de la consulta médica realizada por el interno y asigna la rúbrica oficial.
+    OPTIMIZADO PARA RIGOR (Gemini Pro).
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
-        self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]
+        # Usamos PRO para maximizar la rigurosidad clínica en la evaluación
+        import sys
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        if root_dir not in sys.path:
+            sys.path.append(root_dir)
+        from antigravity_config import AntigravityConfig
+        self.fallback_models = AntigravityConfig.FALLBACK_PRO_MODELS
 
     @property
     def client(self):
@@ -34,8 +42,8 @@ class OSCEEvaluatorAgent:
 
     def evaluate_simulation(self, ground_truth: dict, chat_history: list) -> dict:
         prompt = f"""
-        Eres un Profesor de Medicina de la Universidad Austral de Chile y Evaluador Oficial de Estaciones ECOE (OSCE).
-        Tu tarea es calificar con rigor académico la interacción de un interno de medicina con un Paciente Simulado.
+        Eres un Profesor Titular de Medicina de la Universidad Austral de Chile y Evaluador Oficial de Estaciones ECOE (OSCE).
+        Tu tarea es calificar con EXTREMO RIGOR ACADÉMICO la interacción de un interno de medicina con un Paciente Simulado.
 
         VERDAD DE TERRENO Y PAUTA OFICIAL DEL CASO (GROUND TRUTH):
         - Diagnóstico Indiscutible: {ground_truth.get('diagnostico_correcto', '')}
@@ -47,10 +55,13 @@ class OSCEEvaluatorAgent:
         TRANSCRIPCIÓN COMPLETA DE LA CONSULTA DEL ALUMNO:
         {json.dumps(chat_history, ensure_ascii=False, indent=2)}
 
-        Evalúa y asigna el puntaje en cada una de las 5 dimensiones (0 a 20 puntos cada una) y calcula el total de 0 a 100%. Redacta un feedback docente constructivo.
+        INSTRUCCIONES:
+        1. Eres inclemente con los errores de seguridad del paciente. Si olvida alergias, no toma signos vitales en un paciente grave, o receta mal, debes incluirlo en `critical_errors_missed`.
+        2. Asigna puntajes de 0 a 20 de manera realista. Un alumno promedio saca 14, uno excelente 18.
+        3. Detalla en `clinical_reasoning_assessment` qué sesgo cognitivo o fallo tuvo el alumno.
+        4. REGLA CONSTITUCIONAL (INTEGRIDAD CLÍNICA): Si la transcripción está vacía, manifiestamente incompleta o es incomprensible, NO alucines un puntaje. Debes incluir obligatoriamente el tag "[REQUIERE ACLARACIÓN CLÍNICA]" en tu `qualitative_feedback` y evaluar con puntaje 0.
         """
         
-        last_error = ""
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
@@ -72,15 +83,16 @@ class OSCEEvaluatorAgent:
                         
                     return report.model_dump() if hasattr(report, "model_dump") else report.dict()
                 except Exception as e:
-                    last_error = str(e)
                     time.sleep(0.5)
                     
         return {
-            "score_anamnesis": 15.0,
-            "score_physical_exam": 15.0,
-            "score_diagnostic_tests": 15.0,
-            "score_diagnosis_accuracy": 15.0,
-            "score_clinical_management": 15.0,
-            "total_score_percentage": 75.0,
-            "qualitative_feedback": f"Evaluación registrada con éxito. (Se realizó reintento automático de IA)."
+            "score_anamnesis": 0.0,
+            "score_physical_exam": 0.0,
+            "score_diagnostic_tests": 0.0,
+            "score_diagnosis_accuracy": 0.0,
+            "score_clinical_management": 0.0,
+            "total_score_percentage": 0.0,
+            "critical_errors_missed": ["Error del sistema al evaluar"],
+            "clinical_reasoning_assessment": "No se pudo completar.",
+            "qualitative_feedback": "Error del sistema evaluador."
         }
