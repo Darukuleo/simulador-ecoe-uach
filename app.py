@@ -5,6 +5,10 @@ src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "src"))
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 import streamlit as st
+from streamlit_mic_recorder import mic_recorder
+from google import genai
+from google.genai import types
+import hashlib
 import streamlit.components.v1 as components
 import os
 import sys
@@ -209,6 +213,28 @@ keys_defaults = {
 for key, val in keys_defaults.items():
     if key not in st.session_state:
         st.session_state[key] = val
+
+
+def transcribe_audio_gemini(audio_bytes):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return "Error: API Key no encontrada."
+        
+    client = genai.Client(api_key=api_key)
+    prompt = "Transcribe exactamente lo que dice este audio en español. No agregues nada más que la transcripción literal, no inventes texto."
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                types.Part.from_bytes(data=audio_bytes, mime_type='audio/wav'),
+                prompt
+            ]
+        )
+        return response.text.strip()
+    except Exception as e:
+        return f"Error al transcribir: {e}"
+
 
 def render_voice_input_widget():
     st.caption("🎙️ **Control de Voz:** Puedes presionar el micrófono para hablarle al paciente o escribir abajo.")
