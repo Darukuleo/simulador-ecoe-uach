@@ -24,8 +24,8 @@ class OSCEEvaluatorAgent:
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
-        # Usamos PRO si está disponible, sino usamos FLASH (que sabemos que funciona)
-        self.fallback_models = ["gemini-3.6-pro", "gemini-3.6-flash", "gemini-3.5-flash"]
+        # Usamos PRO (3.1) para maximizar la rigurosidad clínica, o FLASH si hay algún problema
+        self.fallback_models = ["gemini-3.1-pro", "gemini-3.6-flash"]
 
     @property
     def client(self):
