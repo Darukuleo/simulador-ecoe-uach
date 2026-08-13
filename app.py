@@ -574,8 +574,12 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     render_voice_input_widget()
 
 
-
-                    user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
+                    if remaining <= 0:
+                        st.error("⏰ ¡Tiempo agotado! Debes finalizar la estación.")
+                        user_input = st.chat_input("Tiempo agotado", disabled=True)
+                    else:
+                        user_input = st.chat_input("Escribe tu pregunta o indicación al paciente (o usa el micrófono arriba)...")
+                    
                     if user_input:
                         if not st.session_state.patient_agent:
                             st.error("⚠️ Ingrese su API Key en la barra lateral para conversar.")
