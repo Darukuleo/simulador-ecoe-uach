@@ -289,6 +289,30 @@ def render_voice_input_widget():
     """
     components.html(voice_html, height=75)
 
+
+def get_patient_avatar(gt_data):
+    nombre = str(gt_data.get('paciente_nombre', '')).lower()
+    edad = 50
+    try:
+        edad = int(gt_data.get('edad', 50))
+    except:
+        pass
+    
+    # Heurística simple para sexo basada en el nombre
+    nombres_fem = ['maría', 'maria', 'ana', 'rosa', 'carmen', 'julia', 'marta', 'isabel', 'laura', 'paula', 'pía', 'antonia', 'fernanda']
+    is_female = False
+    for nf in nombres_fem:
+        if nf in nombre:
+            is_female = True
+            break
+            
+    if edad > 60:
+        return "👵" if is_female else "👴"
+    elif edad < 15:
+        return "👧" if is_female else "👦"
+    else:
+        return "👩" if is_female else "👨"
+
 def render_patient_tts(text_to_speak, emotion_mode="🔴 Dolor Agudo / Agitado"):
     rate = 1.0
     pitch = 1.0
@@ -517,8 +541,10 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     
                     st.info(f"📋 **HOJA DE INSTRUCCIONES PARA EL INTERNO (DOOR SHEET):**\n\n* **Ubicación / Contexto:** {gt_data.get('motivo_consulta')}\n* **Paciente:** {gt_data.get('paciente_nombre')}, {gt_data.get('edad', '50')} años.\n* **Tareas:** Realice la anamnesis focalizada, indique si examina al paciente o solicite los exámenes de laboratorio/imágenes necesarios. Indique su manejo táctico inicial.")
                     
+                    pat_avatar = get_patient_avatar(gt_data)
                     for msg in st.session_state.chat_history:
-                        with st.chat_message(msg["role"]):
+                        avatar = "🧑‍⚕️" if msg["role"] == "user" else pat_avatar
+                        with st.chat_message(msg["role"], avatar=avatar):
                             st.markdown(msg["content"])
 
                     render_voice_input_widget()
@@ -532,10 +558,10 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                         else:
                             st.session_state.chat_history.append({"role": "user", "content": user_input})
                             
-                            with st.chat_message("user"):
+                            with st.chat_message("user", avatar="🧑‍⚕️"):
                                 st.markdown(user_input)
                                 
-                            with st.chat_message("assistant"):
+                            with st.chat_message("assistant", avatar=pat_avatar):
                                 stream = st.session_state.patient_agent.respond_to_student_stream(gt_data, st.session_state.chat_history, user_input)
                                 resp = st.write_stream(stream)
                                 
@@ -545,9 +571,14 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                                 render_patient_tts(resp, st.session_state.get('patient_emotion', '🔴 Dolor Agudo / Agitado'))
 
                     st.markdown("---")
-                    col_b1, col_b2 = st.columns([2, 1])
+                    
+                    if len(st.session_state.chat_history) < 2:
+                        st.info("💬 Realiza al menos 1 pregunta al paciente para poder finalizar la estación.")
+                        
+                    col_b1, col_b2 = st.columns([1, 1])
                     with col_b2:
-                        if st.button(f"🏁 Finalizar Estación {idx+1} y Ver Breve Feedback ➔", type="primary"):
+                        btn_disabled = len(st.session_state.chat_history) < 2
+                        if st.button(f"🚪 SALIR DEL BOX Y FINALIZAR (No presionar para conversar)", type="primary", disabled=btn_disabled, help="Haz clic aquí solo cuando hayas terminado toda tu atención médica."):
                             if not st.session_state.evaluator_agent:
                                 st.error("⚠️ Requiere API Key para evaluar.")
                             else:
