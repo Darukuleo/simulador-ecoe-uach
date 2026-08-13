@@ -18,7 +18,7 @@ from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
 from database import (
-    init_db, insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
+    insert_caso_ecoe, get_casos_ecoe, insert_sesion_simulacion, insert_evaluacion, 
     get_evaluaciones_por_alumno, get_todas_evaluaciones, get_config_examen, update_config_examen,
     insert_encuesta_investigacion, get_todas_encuestas, export_all_data_json, import_all_data_json,
     calcular_nota_chile, append_permanent_log
@@ -183,8 +183,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-init_db()
-
+# Inicializamos la base de datos y cargamos casos hardcodeados si está vacía
 existing_cases = get_casos_ecoe()
 if not existing_cases:
     from importer import import_all_stations
