@@ -2,12 +2,165 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(__file__))
-from database import insert_caso_ecoe
+from database import insert_caso_ecoe, db
 
-STATIONS_DATA = [{'codigo': 'EST-201', 'titulo': 'Trauma Penetrante Abdominal por Arma Blanca', 'especialidad': 'Cirugía de Urgencias / Trauma', 'dificultad': 'Intermedio (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Matías Sepúlveda', 'edad': '25', 'motivo_consulta': 'Dolor abdominal severo y sangrado tras sufrir agresión por arma blanca en abdomen hace 20 minutos.', 'historia_clinica': 'Ingresa traído por SAMU en camilla. Paciente refiriendo dolor 10/10 en el vientre tras recibir estocada con cuchillo en flanco e hipocondrio izquierdo durante una riña. Presenta mareos intensos y sensación de desmayo.', 'antecedentes': 'Sin antecedentes mórbidos conocidos. No toma medicamentos. Última ingesta de alimentos no precisada.', 'examen_fisico': 'PA 85/50 mmHg (Hipotenso), FC 128 bpm (Taquicárdico, pulso filiforme), FR 26 rpm, SatO2 93% ambiental. Pálido, sudoroso. Abdomen: Herida cortopenetrante de 3 cm en flanco izquierdo con salida de líquido intestinal/sangre. Abdomen rígido en tabla con dolor difuso intolerable y Blumberg (+) generalizado.', 'examenes_laboratorio_imagenes': 'Hemograma: Hb 7.8 g/dL, Hcto 24%, Leucocitos 16.000/mm3. Gases Arteriales: pH 7.21, BE -12, Lactato 5.2 mmol/L. Eco-FAST: Positivo para líquido libre abundante en espacio esplenorrenal y Douglas.', 'diagnostico_correcto': 'Trauma Abdominal Penetrante por Arma Blanca / Shock Hemorrágico y Peritonitis Severa', 'anamnesis_esperada': 'Preguntar mecanismo de agresión, tiempo transcurrido, síntomas de shock (mareo, sed, debilidad) y antecedentes.', 'examen_fisico_esperado': 'Evaluación primaria ATLS (XABCDE), inspección de herida penetrante, evaluación de signos peritoneales y pulsos periféricos.', 'examenes_indispensables': 'Clasificación de grupo sanguíneo y pruebas cruzadas para 4 UGRC, Hemograma, Gases arteriales con Lactato, Ecografía FAST de urgencia.', 'conducta_correcta': 'Indicación de 2 vías venosas periféricas gruesas (14-16G), cristaloides tibios, activación de protocolo de transfusión masiva, analgesia IV, cobertura antibiótica de amplio espectro, profilaxis antitetánica y reserva URGENTE de pabellón para LAPAROTOMÍA EXPLORADORA INMEDIATA.'}}, {'codigo': 'EST-202', 'titulo': 'Perforación de Úlcera Péptica (Abdomen Agudo)', 'especialidad': 'Cirugía Digestiva Alta', 'dificultad': 'Intermedio (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Roberto Morales', 'edad': '52', 'motivo_consulta': 'Dolor abdominal súbito tipo puñalada en epigastrio iniciado hace 4 horas.', 'historia_clinica': 'El dolor se inició de forma brusca en epigastrio mientras estaba descansando y rápidamente se generalizó a todo el vientre. Refiere que cualquier movimiento le intensifica el dolor. Ha tenido náuseas y vómitos escasos.', 'antecedentes': 'Lumbago crónico en tratamiento con Ketoprofeno u Ibuprofeno diario sin protector gástrico por 6 meses. Fumador de 10 cigarrillos al día.', 'examen_fisico': 'PA 105/65 mmHg, FC 110 bpm, FR 22 rpm, T° 38.0 °C. Inmóvil en camilla. Abdomen: Vientre en tabla (contractura muscular involuntaria férrea invencible). Dolor insoportable a la palpación difusa con rebote positivo. Desaparición de matidez hepática a la percusión (Signo de Jobert +). RHA abolidos.', 'examenes_laboratorio_imagenes': 'Radiografía de Tórax de Pie: Presencia de aire subdiafragmático bilateral (Neumoperitoneo / Signo de Popper). Leucocitos: 17.500/mm3 con 88% neutrófilos, PCR: 180 mg/L.', 'diagnostico_correcto': 'Úlcera Péptica Perforada / Abdomen Agudo Peritoneal por Perforación de Víscera Hueca', 'anamnesis_esperada': 'Indagar inicio brusco en puñalada, consumo de AINEs/aspirina, antecedente ulceroso y tabaquismo.', 'examen_fisico_esperado': 'Identificar contractura involuntaria en tabla, percutir matidez hepática (Signo de Jobert) y evaluar irritación peritoneal.', 'examenes_indispensables': 'Radiografía de Tórax de pie o TC de Abdomen, Hemograma, Perfil bioquímico, Pruebas de coagulación.', 'conducta_correcta': 'Régimen cero, instalación de SNG a libre débito, reanimación hidroelectrolítica IV, antibióticos IV de amplio espectro, IBP IV e indicación de laparotomía/laparoscopía de urgencia para aseo peritoneal y cierre primario con parche de epiplón (Parche de Graham).'}}, {'codigo': 'EST-203', 'titulo': 'Colangitis Aguda Grave (Péntada de Reynolds)', 'especialidad': 'Cirugía Hepatobiliar / Gastroenterología', 'dificultad': 'Avanzado (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Carmen Gloria Valenzuela', 'edad': '65', 'motivo_consulta': 'Ictericia, fiebre alta con escalofríos y compromiso de conciencia.', 'historia_clinica': 'Paciente traída por su hija. Presenta antecedente de cálculos a la vesícula no operados. Hace 24 horas comenzó con dolor en hipocondrio derecho y fiebre; hoy en la mañana notaron tinte amarillo en ojos y piel, se puso somnolienta y confundida.', 'antecedentes': 'Diabetes Mellitus Tipo 2, Colelitiasis sintomática conocida.', 'examen_fisico': 'PA 85/55 mmHg (Hipotensa), FC 122 bpm, FR 24 rpm, T° 39.2 °C. Somnolienta, desorientada (Glasgow 13). Ictericia franca en piel y escleras. Abdomen: Dolor a la palpación en hipocondrio derecho y epigastrio. Signo de Murphy (+). RHA disminuidos.', 'examenes_laboratorio_imagenes': 'Bilirrubina Total: 6.8 mg/dL (Bilirrubina Directa: 5.2 mg/dL), FA: 480 U/L, GGT: 390 U/L. Leucocitos: 22.000/mm3 con 10% baciliformes, Lactato: 4.2 mmol/L. Ecografía Abdominal: Vesícula litiásica y Coledoco dilatado de 13 mm con cálculo impactado en coledoco distal (Coledocolitiasis).', 'diagnostico_correcto': 'Colangitis Aguda Grave (Péntada de Reynolds: Fiebre + Ictericia + Dolor CSD + Hipotensión + Compromiso Conciencia) / Sepsis Biliar', 'anamnesis_esperada': 'Indagar triada de Charcot y síntomas de shock/sepsis, antecedentes biliares y desorientación.', 'examen_fisico_esperado': 'Evaluar estado de conciencia, signos vitales para shock séptico, ictericia y palpación abdominal de CSD.', 'examenes_indispensables': 'Perfil hepático completo, Ecografía abdominal, Hemograma, Gases arteriales/Lactato, Hemocultivos.', 'conducta_correcta': 'Reanimación agresiva con cristaloides IV, antibióticos IV de amplio espectro, ingreso a UPC/UCI y descompresión biliar URGENTE de elección por CPRE (o drenaje percutáneo/quirúrgico).'}}, {'codigo': 'EST-204', 'titulo': 'Trombosis Hemorroidal Aguda Externa', 'especialidad': 'Coloproctología / Cirugía General', 'dificultad': 'Básico/Intermedio (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Gonzalo Tapia', 'edad': '41', 'motivo_consulta': 'Dolor anal intenso de inicio brusco y bulto doloroso en margen anal hace 12 horas.', 'historia_clinica': 'El paciente notó la aparición de una bolita dura y muy dolorosa en el margen anal tras realizar un esfuerzo defecatorio intenso por constipación. El dolor es constante, punzante (8/10) y le impide sentarse con normalidad.', 'antecedentes': 'Constipación crónica, dieta baja en fibra, trabajo de oficina sedentario.', 'examen_fisico': 'PA 120/75 mmHg, FC 78 bpm, T° 36.5 °C. Posición genupectoral/Sims. Inspección Anal: Nódulo anal externo de 1.5 cm violáceo/azulado tenso, recubierto de anodermo en hora 7. Palpación: Nódulo firme, muy sensible, no reducible.', 'examenes_laboratorio_imagenes': 'Sin exámenes de laboratorio ni imágenes requeridos en fase inicial. Diagnóstico 100% clínico.', 'diagnostico_correcto': 'Trombosis Hemorroidal Externa Aguda (< 72 horas de evolución)', 'anamnesis_esperada': 'Preguntar tiempo de evolución, características del dolor, antecedente de constipación o esfuerzo y descarte de sangrado activo masivo.', 'examen_fisico_esperado': 'Inspección proctológica cuidadosa, palpación del nódulo externo y descarte de absceso/necrosis.', 'examenes_indispensables': 'No requiere ex. complementarios. Examen proctológico directo.', 'conducta_correcta': 'Indicación de Trombectomía anal bajo anestesia local en box (al llevar < 72 hrs con dolor severo) o manejo médico conservador con baños de asiento tibios, analgesia oral (AINEs/Paracetamol), laxantes formadores de bolo (Psyllium) y ablandadores de deposición.'}}, {'codigo': 'EST-205', 'titulo': 'Isquemia Aguda de Extremidad Inferior (Las 6 P)', 'especialidad': 'Cirugía Vascular', 'dificultad': 'Intermedio/Avanzado (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Héctor Soto', 'edad': '72', 'motivo_consulta': 'Dolor súbito e insoportable en pierna izquierda con frialdad y adormecimiento hace 4 horas.', 'historia_clinica': 'El dolor se inició en forma súbita mientras estaba sentado. Sintió que la pierna izquierda se le durmió y se le puso como de hielo, perdiendo fuerza en el pie.', 'antecedentes': 'Fibrilación Auricular (FA) no anticoagulada, Infarto previo. Dejó los anticoagulantes hace 4 meses.', 'examen_fisico': 'PA 135/85 mmHg, FC 112 bpm (arritmia por FA), FR 18 rpm, T° 36.2 °C. Extremidad izquierda: Pálida desde el tercio medio de pierna hacia distal, fría al tacto (Poiquilotermia), llenado capilar abolido. Pulsos: Femoral presente, pero Poplíteo, Tibial Posterior y Pedio IZQUIERDOS AUSENTES. Parestesias en dorso de pie y paresia leve.', 'examenes_laboratorio_imagenes': 'ECG: Fibrilación Auricular con respuesta ventricular rápida (112 lpm). Angio-TC de Extremidades Inferiores: Defecto de rellenado completo en la arteria poplítea izquierda por embolia arterial.', 'diagnostico_correcto': 'Isquemia Aguda de Extremidad Inferior Izquierda Origen Embólico (Fibrilación Auricular) / Rutherford IIa-IIb', 'anamnesis_esperada': 'Indagar inicio súbito, antecedentes cardiológicos (FA/arritmia) y presencia de las 6 P.', 'examen_fisico_esperado': 'Examen completo de pulsos periféricos bilaterales, temperatura, palidez, llene capilar y función sensitivo-motora.', 'examenes_indispensables': 'ECG de 12 derivaciones, Angio-TC de extremidades inferiores o Eco-Doppler arterial.', 'conducta_correcta': 'Heparinización IV inmediata con heparina no fraccionada (bolo 5.000 UI + infusión), protección térmica de la extremidad, analgesia e INTERCONSULTA URGENTE A CIRUGÍA VASCULAR para Revascularización (Embolectomía con sonda Fogarty).'}}, {'codigo': 'EST-206', 'titulo': 'Neumotórax a Tensión (Descompresión y Pleurostomía)', 'especialidad': 'Cirugía Torácica / Urgencias', 'dificultad': 'Avanzado (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Esteban Riquelme', 'edad': '28', 'motivo_consulta': 'Disnea severa progresiva y dolor torácico tras accidente de tránsito en moto.', 'historia_clinica': 'Paciente trasladado por SAMU tras volcar en moto. Ingresa con gran apremio respiratorio, cianosis labial y uso de musculatura accesoria. Responde solo con monosílabos.', 'antecedentes': 'Joven previo sano.', 'examen_fisico': 'PA 75/45 mmHg (Hipotenso grave), FC 135 bpm, FR 34 rpm, SatO2 81% ambiental. Desviación traqueal a la IZQUIERDA en hueco supraesternal. Hemitórax Derecho: Insuflado, sin excursión. Auscultación: Murmullo pulmonar ABOLIDO a derecha. Percusión: Timpanismo marcado a derecha. Ingurgitación yugular evidente (+++).', 'examenes_laboratorio_imagenes': 'NO ESPERAR IMÁGENES. Si el alumno pide Rx antes de actuar, el paciente cae en Paro AESP. Diagnóstico 100% clínico.', 'diagnostico_correcto': 'Neumotórax a Tensión Derecho con Shock Obstructivo', 'anamnesis_esperada': 'Reconocimiento inmediato del mecanismo de trauma y disnea severa.', 'examen_fisico_esperado': 'Auscultar murmullo pulmonar, percutir timpanismo, evaluar desviación traqueal e ingurgitación yugular.', 'examenes_indispensables': 'NO solicitar Rx de tórax antes de la descompresión. Rx de tórax de control solo POST-pleurostomía.', 'conducta_correcta': 'DESCOMPRESIÓN INMEDIATA CON AGUJA de grueso calibre (14-16G) en 5° espacio intercostal línea axilar anterior o 2° EIC LMC derecha. Tras la salida de aire a presión, indicar instalación de Tubo de Pleurostomía (28-32 Fr) conectado a trampa de agua con aspiración continua (-20 cmH2O).'}}, {'codigo': 'EST-207', 'titulo': 'Nódulo Mamario Sospechoso (BIRADS 4B)', 'especialidad': 'Cirugía Oncológica / Patología Mamaria', 'dificultad': 'Intermedio (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Patricia Toledo', 'edad': '54', 'motivo_consulta': 'Acude a buscar resultado de mamografía de pesquisa tomada en el CESFAM.', 'historia_clinica': 'Paciente asintomática que acude a control para revisar su mamografía. No se ha palpado bultos ni ha tenido secreción por pezón. Se encuentra ansiosa por conocer el informe.', 'antecedentes': 'Madre tuvo cáncer de mama a los 50 años. Menarquia a los 11 años, primer hijo a los 35 años, uso de Terapia de Reemplazo Hormonal por 6 años.', 'examen_fisico': 'PA 125/80 mmHg, FC 74 bpm. Mamas: En CSE de mama izquierda se palpa nódulo indoloro de 1.5 cm, duro, de bordes mal definidos. Axila: Se palpa 1 adenopatía axilar izquierda de 1 cm, móvil.', 'examenes_laboratorio_imagenes': 'Informe Mamográfico: Mama izquierda muestra en CSE lesión nodular espiculada de 14 mm con microcalcificaciones pleomórficas agrupadas. Categoría BIRADS 4B.', 'diagnostico_correcto': 'Nódulo Mamario Sospechoso de Malignidad / Cáncer de Mama Izquierdo BIRADS 4B', 'anamnesis_esperada': 'Indagar antecedentes familiares de cáncer de mama/ovario, factores de riesgo hormonales y reproductivos.', 'examen_fisico_esperado': 'Examen físico mamario metódico en 4 cuadrantes y palpación de fosas axilares y supraclaviculares.', 'examenes_indispensables': 'Mamografía bilateral y Ecografía mamaria, Biopsia Core / aguja gruesa Tru-cut.', 'conducta_correcta': 'Comunicar con empatía el informe mamográfico, notificar mediante Formulario GES de Sospecha de Cáncer de Mama y derivar de forma prioritaria a la Unidad de Patología Mamaria para Biopsia Core (Tru-cut).'}}, {'codigo': 'EST-208', 'titulo': 'Hernia Crural Atascada u Obstruida', 'especialidad': 'Cirugía de Pared Abdominal / Urgencias', 'dificultad': 'Intermedio (Interno Medicina)', 'ground_truth': {'paciente_nombre': 'Elena Oyarzún', 'edad': '70', 'motivo_consulta': 'Dolor abdominal cólico, náuseas, vómitos fecaloideos y masa dolorosa en la ingle derecha.', 'historia_clinica': 'Comenzó hace 18 horas con dolor en la ingle derecha y abultamiento que no se pudo reintroducir. Luego presentó dolor abdominal difuso, distensión y vómitos oscuros fecaloideos con detención de gases y deposiciones.', 'antecedentes': 'Hipertensión arterial. Refiere abultamiento en la ingle desde hace 1 año al que no le dio importancia.', 'examen_fisico': 'PA 100/60 mmHg, FC 115 bpm, T° 37.6 °C. Abdomen: Distendido, doloroso a la palpación difusa, RHA de lucha metálicos. Orificios Herniarios: En región inguinocrural derecha, POR DEBAJO del ligamento inguinal, se palpa masa de 3 cm, violácea, dura, extremadamente dolorosa e NO REDUCTIBLE.', 'examenes_laboratorio_imagenes': 'Radiografía de Abdomen Simple: Múltiples asas delgadas distendidas con niveles hidroaéreos en escalera y ausencia de gas en ampolla rectal. Leucocitos: 15.800/mm3, Hcto 48%.', 'diagnostico_correcto': 'Hernia Crural (Femoral) Derecha Atascada / Obstrucción Intestinal Mecánica', 'anamnesis_esperada': 'Indagar tríada obstructiva (dolor cólico, vómitos, detención de gases/deposiciones) y antecedente herniario.', 'examen_fisico_esperado': 'Examen abdominal y examen sistemático de orificios herniarios inguinales y crurales bilaterales.', 'examenes_indispensables': 'Radiografía de abdomen simple en dos posiciones, Hemograma, Electrolitos y función renal.', 'conducta_correcta': 'CONTRAINDICAR REDUCCIÓN MANUAL FORZADA (taxis) por riesgo de perforación de asa estrangulada, régimen cero, instalación de SNG a libre débito, reanimación con fluidos IV, antibióticos IV y derivación URGENTE a Cirugía General para Hernioplastia Crural de Urgencia.'}}]
+STATIONS_DATA = [
+    {
+        'codigo': 'EST-301', 
+        'titulo': 'Apendicitis Aguda Clásica', 
+        'especialidad': 'Cirugía General', 
+        'dificultad': 'Básico (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Javier Morales', 
+            'edad': '22', 
+            'motivo_consulta': 'Dolor abdominal que partió en la boca del estómago y ahora está abajo a la derecha.', 
+            'historia_clinica': 'El cuadro inició hace 12 horas con un dolor sordo periumbilical y náuseas (vomitó una vez). Hace 4 horas el dolor migró y se localizó en la fosa ilíaca derecha, haciéndose punzante y continuo (intensidad 8/10). No tiene apetito. No ha tenido fiebre alta, solo sensación febril.', 
+            'antecedentes': 'Sano, sin cirugías previas ni uso de medicamentos.', 
+            'examen_fisico': 'PA 120/75, FC 98 bpm, T° 37.8 °C. Abdomen plano, RHA presentes. Sensibilidad exquisita en fosa ilíaca derecha. Signo de McBurney (+), Signo de Blumberg (+) franco en FID. Rovsing negativo.', 
+            'examenes_laboratorio_imagenes': 'Hemograma: Leucocitosis de 14.500 con 85% PMN. PCR: 45 mg/L. Orina completa normal.', 
+            'diagnostico_correcto': 'Apendicitis Aguda', 
+            'anamnesis_esperada': 'Indagar cronología de Murphy (migración del dolor), síntomas asociados (anorexia, náuseas) y antecedentes quirúrgicos.', 
+            'examen_fisico_esperado': 'Buscar signos de irritación peritoneal focalizada (Blumberg, McBurney).', 
+            'examenes_indispensables': 'Hemograma, PCR y Orina completa (para descartar ITU).', 
+            'conducta_correcta': 'Régimen cero, hidratación IV, analgesia IV (Paracetamol/AINEs), cobertura antibiótica profiláctica y preparación para Apendicectomía de urgencia.'
+        }
+    },
+    {
+        'codigo': 'EST-302', 
+        'titulo': 'Colecistitis Aguda Calculosa', 
+        'especialidad': 'Cirugía General', 
+        'dificultad': 'Intermedio (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Rosaura Pinal', 
+            'edad': '45', 
+            'motivo_consulta': 'Dolor fuerte debajo de la costilla derecha y fiebre.', 
+            'historia_clinica': 'Cuadro de 24 horas de evolución de dolor tipo cólico en hipocondrio derecho irradiado al dorso derecho. Inició tras comer empanadas fritas. Refiere que siempre le dolía un poco y pasaba, pero ahora el dolor es constante, no cede, y en la mañana presentó fiebre con escalofríos.', 
+            'antecedentes': 'Multípara de 3, Obesidad leve. Sabía que tenía "piedras" en la vesícula pero no se quiso operar.', 
+            'examen_fisico': 'PA 130/80, FC 90 bpm, T° 38.5 °C. Abdomen doloroso a la palpación en hipocondrio derecho. Signo de Murphy (+) claro (tope inspiratorio al palpar). Sin signos de irritación peritoneal difusa. No hay ictericia clínica.', 
+            'examenes_laboratorio_imagenes': 'Leucocitos 13.000, PCR 80. Pruebas hepáticas (Bilirrubina, FA, GOT/GPT) normales. Ecografía: Vesícula biliar distendida de 11x5 cm, pared engrosada de 5 mm, múltiples cálculos en su interior, uno de 1.5 cm impactado en el bacinete. Coledoco normal.', 
+            'diagnostico_correcto': 'Colecistitis Aguda Calculosa', 
+            'anamnesis_esperada': 'Indagar tiempo de evolución (>6 hrs para Colecistitis), gatillante alimentario y antecedente de litiasis.', 
+            'examen_fisico_esperado': 'Evaluación dirigida de hipocondrio derecho y búsqueda explícita del Signo de Murphy.', 
+            'examenes_indispensables': 'Hemograma, PCR, Pruebas Hepáticas (para descartar coledocolitiasis) y Ecografía Abdominal.', 
+            'conducta_correcta': 'Hospitalización, régimen cero, sueroterapia, analgesia, antibióticos IV (Ceftriaxona + Metronidazol o similar) y programación para Colecistectomía Laparoscópica.'
+        }
+    },
+    {
+        'codigo': 'EST-303', 
+        'titulo': 'Obstrucción Intestinal por Bridas', 
+        'especialidad': 'Cirugía General', 
+        'dificultad': 'Intermedio (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Mario Gutiérrez', 
+            'edad': '60', 
+            'motivo_consulta': 'Me he hinchado como un globo y vomito todo lo que como.', 
+            'historia_clinica': 'Hace 2 días comenzó con dolor cólico intermitente en todo el abdomen. Progresivamente notó que el vientre se inflaba. Hace 24 horas no elimina gases ni deposiciones y hoy ha vomitado 4 veces un líquido oscuro de muy mal olor (fecaloideo).', 
+            'antecedentes': 'Apendicectomía complicada con peritonitis a los 30 años (laparotomía media).', 
+            'examen_fisico': 'PA 110/65, FC 105 bpm, Sequedad de mucosas ++. Abdomen globuloso, muy distendido, asimétrico, cicatriz media infraumbilical. Timpanismo generalizado a la percusión. RHA aumentados, de timbre metálico. Dolor a la palpación profunda sin irritación peritoneal.', 
+            'examenes_laboratorio_imagenes': 'BUN 35, Creatinina 1.3 (Deshidratación). Rx Abdomen Simple de pie: Niveles hidroaéreos en intestino delgado, imagen en "pila de monedas", ausencia de gas en la ampolla rectal.', 
+            'diagnostico_correcto': 'Obstrucción Intestinal Alta de probable origen Adherencial (Bridas)', 
+            'anamnesis_esperada': 'Preguntar por tránsito intestinal (gases/heces), características del vómito y antecedente de cirugías abdominales.', 
+            'examen_fisico_esperado': 'Evaluar hidratación, percutir abdomen, auscultar RHA metálicos y buscar cicatrices.', 
+            'examenes_indispensables': 'Radiografía de abdomen simple (o TAC), ELP y Función Renal.', 
+            'conducta_correcta': 'Régimen cero, instalación de Sonda Nasogástrica a caída libre, reanimación hídrica vigorosa IV, corrección de ELP y observación estricta o derivación a Cirujano (prueba de contraste).'
+        }
+    },
+    {
+        'codigo': 'EST-304', 
+        'titulo': 'Diverticulitis Aguda', 
+        'especialidad': 'Cirugía General', 
+        'dificultad': 'Avanzado (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Carlos Silva', 
+            'edad': '68', 
+            'motivo_consulta': 'Dolor constante en el lado izquierdo bajo y fiebre.', 
+            'historia_clinica': 'Paciente consulta por cuadro de 3 días de dolor insidioso en fosa ilíaca izquierda, que se ha intensificado progresivamente. Refiere fiebre no cuantificada. Tiene constipación habitual que ha empeorado en los últimos días.', 
+            'antecedentes': 'HTA crónica, constipación de larga data.', 
+            'examen_fisico': 'PA 135/85, FC 92 bpm, T° 38.2 °C. Abdomen: Masa palpable de 4 cm muy dolorosa en fosa ilíaca izquierda (FII), con Blumberg localizado (+). No hay contractura abdominal generalizada.', 
+            'examenes_laboratorio_imagenes': 'Leucocitos 15.000, PCR 120. TAC de Abdomen y Pelvis con contraste: Engrosamiento mural del colon sigmoides con múltiples divertículos, inflamación de la grasa pericólica (stranding) y una pequeña colección líquida de 2 cm (Hinchey Ib o II leve). Sin neumoperitoneo.', 
+            'diagnostico_correcto': 'Diverticulitis Aguda (Hinchey I o II)', 
+            'anamnesis_esperada': 'Historia de constipación, dolor en FII y descarte de síntomas urinarios.', 
+            'examen_fisico_esperado': 'Palpación dirigida en FII buscando masa o irritación peritoneal focal.', 
+            'examenes_indispensables': 'TAC de Abdomen y Pelvis con contraste (Gold Standard), Hemograma y PCR.', 
+            'conducta_correcta': 'Hospitalización, reposo digestivo, antibióticos IV (Ej. Ceftriaxona + Metronidazol) e interconsulta a Cirugía para manejo médico (no requiere cirugía de urgencia inicial por colección pequeña).'
+        }
+    },
+    {
+        'codigo': 'EST-305', 
+        'titulo': 'Gran Quemado (Trauma)', 
+        'especialidad': 'Cirugía General / Plástica', 
+        'dificultad': 'Intermedio (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Pedro Arancibia', 
+            'edad': '35', 
+            'motivo_consulta': 'Ingreso traído por ambulancia tras quedar atrapado en incendio de casa.', 
+            'historia_clinica': 'Rescatado de estructura en llamas, expuesto a humo denso en ambiente cerrado por 10 minutos. Refiere mucho dolor en la cara y brazo, pero no siente dolor en el pecho.', 
+            'antecedentes': 'Sin antecedentes. Pesa 70 kg.', 
+            'examen_fisico': 'Vibrisas nasales quemadas, esputo carbonáceo. Ronquera leve. Quemaduras: Cara completa (4.5% - tipo AB), Tórax y Abdomen anterior (18% - tipo B/escaras secas indoloras), Brazo derecho completo (9% - tipo A/AB con flictenas). Total SCQ: ~31.5%.', 
+            'examenes_laboratorio_imagenes': 'Gases arteriales iniciales: sospecha de intoxicación por CO. Fibrobroncoscopía (si la piden): Edema supraglótico moderado con hollín.', 
+            'diagnostico_correcto': 'Gran Quemado (>20% SCQ) con Sospecha de Quemadura de Vía Aérea', 
+            'anamnesis_esperada': 'Mecanismo de lesión (espacio cerrado vs abierto), tiempo de exposición, cálculo rápido de SCQ y peso del paciente para reanimación.', 
+            'examen_fisico_esperado': 'Evaluación ABCDE. Buscar signos de quemadura de vía aérea (vibrisas, voz ronca) y aplicar Regla de los 9.', 
+            'examenes_indispensables': 'Ninguno retrasa el manejo inicial. Gases arteriales / Carboxihemoglobina si disponible.', 
+            'conducta_correcta': 'Asegurar Vía Aérea (Intubación Orotraqueal profiláctica inmediata por signos de vía aérea superior), O2 al 100%, 2 vías venosas periféricas e iniciar fluidoterapia vigorosa (Parkland o 2-4 ml/kg/%SCQ Ringer Lactato), analgesia agresiva IV y traslado a Unidad de Quemados (GES).'
+        }
+    },
+    {
+        'codigo': 'EST-306', 
+        'titulo': 'Sospecha de Cáncer Colorectal (Sind. Anémico)', 
+        'especialidad': 'Cirugía Oncológica / General', 
+        'dificultad': 'Intermedio (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Luisa Fernández', 
+            'edad': '72', 
+            'motivo_consulta': 'Me canso mucho, estoy pálida y las heces a veces salen con sangre oscura.', 
+            'historia_clinica': 'Consulta por cuadro de 4 meses de astenia profunda, fatiga al caminar y baja de peso de 6 kg involuntaria. Refiere que últimamente tiene episodios de diarrea que se alternan con días que no va al baño. Ha notado deposiciones de color burdeo/oscuro en ocasiones.', 
+            'antecedentes': 'Hermano falleció de Cáncer de Colon a los 60 años.', 
+            'examen_fisico': 'Pálida (+++). FC 100 bpm. Abdomen: Blando, indoloro, masa dura y móvil palpable en fosa ilíaca derecha. Tacto rectal: Ampolla rectal vacía, deposiciones oscuras en guante (Test de sangre oculta positivo).', 
+            'examenes_laboratorio_imagenes': 'Hemograma: Hb 8.0 g/dL, VCM 72 fL (Anemia Microcítica Hipocrómica).', 
+            'diagnostico_correcto': 'Cáncer de Colon Derecho (Síndrome Anémico Tumoral) / Sospecha', 
+            'anamnesis_esperada': 'Búsqueda de síntomas B (baja de peso), cambio en hábito intestinal, antecedentes familiares oncológicos y caracterización del sangrado.', 
+            'examen_fisico_esperado': 'Examen abdominal para buscar masas y solicitar explícitamente la realización del Tacto Rectal.', 
+            'examenes_indispensables': 'Colonoscopía total con Biopsia (Examen confirmatorio). Hemograma (ya lo tiene, evidencia anemia férrica).', 
+            'conducta_correcta': 'Notificación de Sospecha GES de Cáncer Colorectal, derivación prioritaria a Gastroenterología o Cirugía para Colonoscopía, prescripción de suplementación de fierro y control estricto.'
+        }
+    },
+    {
+        'codigo': 'EST-307', 
+        'titulo': 'Hemotórax Masivo (Trauma Torácico)', 
+        'especialidad': 'Cirugía General / Urgencias', 
+        'dificultad': 'Avanzado (Interno Medicina)', 
+        'ground_truth': {
+            'paciente_nombre': 'Felipe Yáñez', 
+            'edad': '28', 
+            'motivo_consulta': 'Paciente traído por paramédicos con dificultad para respirar severa y presión muy baja tras sufrir herida punzante.', 
+            'historia_clinica': 'Agredido hace 30 minutos con un arma blanca (destornillador) en hemitórax izquierdo, línea media clavicular en el 5to espacio intercostal. Llega sudoroso, pálido y obnubilado.', 
+            'antecedentes': 'Joven, sin antecedentes.', 
+            'examen_fisico': 'PA 70/40 mmHg (Shock grado III/IV), FC 130 bpm, SatO2 88%. Hemitórax izquierdo: Herida de 2 cm. Auscultación: Murmullo Pulmonar ABOLIDO en la base y campo medio izquierdo. Percusión: MATIDEZ franca en lado izquierdo. Venas del cuello planas.', 
+            'examenes_laboratorio_imagenes': 'Fast-Eco (eFAST): Líquido abundante en cavidad pleural izquierda. NO mandar a Rx tórax si el paciente está inestable hemodinámicamente.', 
+            'diagnostico_correcto': 'Hemotórax Masivo Izquierdo (Shock Hemorrágico clase III-IV)', 
+            'anamnesis_esperada': 'Mecanismo de lesión penetrante torácico, estimación rápida de pérdida sanguínea.', 
+            'examen_fisico_esperado': 'Evaluación ABCDE. Auscultación pulmonar y percusión (reconocer matidez vs timpanismo para diferenciar de Neumotórax a tensión).', 
+            'examenes_indispensables': 'Eco-FAST. Hemoclasificación (Grupo y Rh) URGENTE para transfusión.', 
+            'conducta_correcta': 'Reanimación con control de daños (sangre O- o específica, 1:1:1), instalación INMEDIATA de Tubo de Pleurostomía izquierdo (28-32 Fr) para drenar sangre. Si drenaje es >1500 ml o >200 ml/hr x 3 horas, activar protocolo para TORACOTOMÍA de Urgencia en pabellón.'
+        }
+    }
+]
+
+def clear_old_stations():
+    if not db: 
+        print("⚠️ No hay base de datos conectada para borrar.")
+        return
+    print("Borrando casos antiguos en Firestore...")
+    casos_ref = db.collection('casos_ecoe').stream()
+    for doc in casos_ref:
+        doc.reference.delete()
+        print(f" - Borrado {doc.id}")
+    print("✅ Casos antiguos borrados.")
 
 def import_all_stations():
-    print("Importando 8 estaciones del Circuito de Cirugía UACh...")
+    print("Importando 7 estaciones NUEVAS de Cirugía General UACh...")
+    clear_old_stations()
     for st in STATIONS_DATA:
         cid = insert_caso_ecoe(
             codigo=st["codigo"],
@@ -17,7 +170,7 @@ def import_all_stations():
             ground_truth_data=st["ground_truth"]
         )
         print(f"✅ Estación [{st['codigo']}] {st['titulo']} cargada con ID {cid}.")
-    print("🎉 ¡Todas las 8 estaciones registradas en ecoe.db!")
+    print("🎉 ¡Todas las 7 estaciones nuevas registradas en Firestore!")
 
 if __name__ == "__main__":
     import_all_stations()

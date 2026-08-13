@@ -183,10 +183,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inicializamos la base de datos y cargamos casos hardcodeados si está vacía
 existing_cases = get_casos_ecoe()
-if not existing_cases:
-    from importer import import_all_stations
+if len(existing_cases) != 7:
+    from src.importer import import_all_stations
     import_all_stations()
     existing_cases = get_casos_ecoe()
 
