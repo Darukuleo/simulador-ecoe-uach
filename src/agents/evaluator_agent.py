@@ -57,6 +57,7 @@ class OSCEEvaluatorAgent:
         4. REGLA CONSTITUCIONAL (INTEGRIDAD CLÍNICA): Si la transcripción está vacía, manifiestamente incompleta o es incomprensible, NO alucines un puntaje. Debes incluir obligatoriamente el tag "[REQUIERE ACLARACIÓN CLÍNICA]" en tu `qualitative_feedback` y evaluar con puntaje 0.
         """
         
+        last_error = ""
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
@@ -66,7 +67,6 @@ class OSCEEvaluatorAgent:
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
                             response_schema=OSCEEvaluationReport,
-                            temperature=0.1
                         )
                     )
                     
@@ -78,6 +78,7 @@ class OSCEEvaluatorAgent:
                         
                     return report.model_dump() if hasattr(report, "model_dump") else report.dict()
                 except Exception as e:
+                    last_error = str(e)
                     time.sleep(0.5)
                     
         return {
@@ -89,5 +90,5 @@ class OSCEEvaluatorAgent:
             "total_score_percentage": 0.0,
             "critical_errors_missed": ["Error del sistema al evaluar"],
             "clinical_reasoning_assessment": "No se pudo completar.",
-            "qualitative_feedback": "Error del sistema evaluador."
+            "qualitative_feedback": f"Error del sistema evaluador: {last_error}"
         }

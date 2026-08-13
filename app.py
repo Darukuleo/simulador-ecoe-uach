@@ -604,7 +604,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     col_b1, col_b2 = st.columns([1, 1])
                     with col_b2:
                         btn_disabled = len(st.session_state.chat_history) < 2
-                        if st.button(f"🚪 SALIR DEL BOX Y FINALIZAR (No presionar para conversar)", type="primary", disabled=btn_disabled, help="Haz clic aquí solo cuando hayas terminado toda tu atención médica."):
+                        if st.button(f"🚪 SALIR DEL BOX Y FINALIZAR (No presionar para conversar)", type="secondary", disabled=btn_disabled, help="Haz clic aquí solo cuando hayas terminado toda tu atención médica."):
                             if not st.session_state.evaluator_agent:
                                 st.error("⚠️ Requiere API Key para evaluar.")
                             else:
