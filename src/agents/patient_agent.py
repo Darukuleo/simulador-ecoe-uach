@@ -13,12 +13,7 @@ class StandardizedPatientAgent:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
         # Solo usamos FLASH para garantizar latencia mínima en chat en vivo
-        import sys
-        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        if root_dir not in sys.path:
-            sys.path.append(root_dir)
-        from antigravity_config import AntigravityConfig
-        self.fallback_models = AntigravityConfig.FALLBACK_FLASH_MODELS
+        self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
     @property
     def client(self):
