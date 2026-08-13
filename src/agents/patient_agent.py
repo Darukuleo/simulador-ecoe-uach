@@ -13,7 +13,7 @@ class StandardizedPatientAgent:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
         # Solo usamos FLASH para garantizar latencia mínima en chat en vivo
-        self.fallback_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        self.fallback_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
 
     @property
     def client(self):

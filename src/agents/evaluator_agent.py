@@ -25,7 +25,7 @@ class OSCEEvaluatorAgent:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
         # Usamos PRO para maximizar la rigurosidad clínica en la evaluación
-        self.fallback_models = ["gemini-2.5-pro", "gemini-2.0-pro-exp", "gemini-1.5-pro"]
+        self.fallback_models = ["gemini-3.1-pro", "gemini-3.6-pro"]
 
     @property
     def client(self):
