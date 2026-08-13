@@ -50,6 +50,7 @@ class StandardizedPatientAgent:
         Responde como el paciente (recuerda: conciso y actuando tu estado físico):
         """
         
+        last_error = ""
         for model in self.fallback_models:
             try:
                 response = self.client.models.generate_content(
@@ -59,10 +60,11 @@ class StandardizedPatientAgent:
                 if response and response.text:
                     return response.text.strip()
             except Exception as e:
+                last_error = str(e)
                 time.sleep(0.5)
                 continue
                 
-        return f"Doctor(a), me siento mal. Disculpe, ¿me podría repetir lo que me dijo?"
+        return f"Error técnico en el servidor: {last_error}"
 
     def respond_to_student_stream(self, ground_truth: dict, chat_history: list, user_message: str):
         prompt = f"""
@@ -94,6 +96,7 @@ class StandardizedPatientAgent:
         Responde como el paciente:
         """
         
+        last_error = ""
         import time
         for model in self.fallback_models:
             for attempt in range(2):
@@ -107,6 +110,7 @@ class StandardizedPatientAgent:
                             yield chunk.text
                     return
                 except Exception as e:
+                    last_error = str(e)
                     time.sleep(0.5)
                     
-        yield f"Doctor(a), me siento mal por mi dolencia. Disculpe, ¿me podría repetir lo que me dijo?"
+        yield f"Error técnico en el servidor: {last_error}"
