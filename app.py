@@ -355,8 +355,14 @@ def render_patient_tts(text_to_speak, emotion_mode="🔴 Dolor Agudo / Agitado")
         pitch = 1.25
         prefix = "¡Doctor, por favor! "
         
+    import re
     full_text = prefix + text_to_speak if prefix and not text_to_speak.startswith(prefix.strip()) else text_to_speak
-    clean_text = json.dumps(full_text)
+    
+    # Limpiar markdown y puntuación molesta para el TTS
+    speech_text = re.sub(r'[\*\_\#\~\`]', '', full_text)  # Quita negritas y asteriscos
+    speech_text = re.sub(r'^[\-\+]\s+', '', speech_text, flags=re.MULTILINE) # Quita viñetas
+    
+    clean_text = json.dumps(speech_text)
     
     tts_html = f"""
     <script>
@@ -539,7 +545,7 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                         
                         # CRONÓMETRO FLOTANTE / STICKY SIEMPRE VISIBLE AL HACER SCROLL
                         st.markdown(f"""
-                        <div style="
+                        <div id="ecoe-timer-box" style="
                             position: fixed;
                             top: 15px;
                             right: 25px;
@@ -554,9 +560,36 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                             box-shadow: 0 4px 14px rgba(0,0,0,0.18);
                             backdrop-filter: blur(8px);
                         ">
-                            ⏱️ {mins:02d}:{secs:02d}
+                            <span id="ecoe-timer-text">⏱️ {mins:02d}:{secs:02d}</span>
                         </div>
                         """, unsafe_allow_html=True)
+                        
+                        # INYECCIÓN DE JS PARA RELOJ EN TIEMPO REAL
+                        components.html(f"""
+                        <script>
+                            var remaining = {remaining};
+                            var interval = setInterval(function() {{
+                                var timerEl = window.parent.document.getElementById("ecoe-timer-text");
+                                var boxEl = window.parent.document.getElementById("ecoe-timer-box");
+                                if (timerEl && boxEl) {{
+                                    if (remaining > 0) {{
+                                        remaining--;
+                                        var m = Math.floor(remaining / 60).toString().padStart(2, '0');
+                                        var s = (remaining % 60).toString().padStart(2, '0');
+                                        timerEl.innerHTML = "⏱️ " + m + ":" + s;
+                                        if (remaining <= 60) {{
+                                            boxEl.style.backgroundColor = "#FEE2E2";
+                                            boxEl.style.color = "#DC2626";
+                                            boxEl.style.borderColor = "#DC2626";
+                                        }}
+                                    }} else {{
+                                        timerEl.innerHTML = "⏰ Tiempo Agotado";
+                                        clearInterval(interval);
+                                    }}
+                                }}
+                            }}, 1000);
+                        </script>
+                        """, height=0, width=0)
                         
                         if remaining <= 60 and remaining > 0:
                             st.error("⚠️ ¡Queda 1 minuto para finalizar la estación!")

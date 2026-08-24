@@ -1,24 +1,41 @@
+import sys
 import os
 import json
 import time
 from google import genai
+from google.genai import types
+
+# Integración con AntigravityConfig
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+try:
+    from antigravity_config import AntigravityConfig
+    FALLBACK_FLASH = AntigravityConfig.FALLBACK_FLASH_MODELS
+except Exception:
+    FALLBACK_FLASH = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
 
 class StandardizedPatientAgent:
     """
     Agente Paciente Simulado Estandarizado (ECOE/OSCE).
     Responde en primera persona al interno de medicina de forma clínicamente coherente, realista y detallada.
-    OPTIMIZADO PARA VELOCIDAD (Gemini Flash) Y RESPUESTAS CORTAS.
+    OPTIMIZADO PARA VELOCIDAD Y TIEMPO REAL CON GEMINI 3.7 FLASH (LATENCIA CERO).
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
-        # Solo usamos FLASH para garantizar latencia mínima en chat en vivo
-        self.fallback_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.0-flash", "gemini-2.5-flash"]
+        self.fallback_models = FALLBACK_FLASH
 
     @property
     def client(self):
         if self._client is None:
             self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY")
+            if not self.api_key:
+                env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
+                if os.path.exists(env_path):
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip().startswith("GEMINI_API_KEY="):
+                                self.api_key = line.strip().split("=", 1)[1].strip('"').strip("'")
+                                break
             if self.api_key:
                 self._client = genai.Client(api_key=self.api_key)
         return self._client
@@ -53,15 +70,20 @@ class StandardizedPatientAgent:
         last_error = ""
         for model in self.fallback_models:
             try:
+                config_args = {"temperature": 0.4}
+                if "3.7" in model and hasattr(types, "ThinkingConfig"):
+                    config_args["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+
                 response = self.client.models.generate_content(
                     model=model,
-                    contents=prompt
+                    contents=prompt,
+                    config=types.GenerateContentConfig(**config_args)
                 )
                 if response and response.text:
                     return response.text.strip()
             except Exception as e:
                 last_error = str(e)
-                time.sleep(0.5)
+                time.sleep(0.3)
                 continue
                 
         return f"Error técnico en el servidor: {last_error}"
@@ -97,13 +119,17 @@ class StandardizedPatientAgent:
         """
         
         last_error = ""
-        import time
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
+                    config_args = {"temperature": 0.4}
+                    if "3.7" in model and hasattr(types, "ThinkingConfig"):
+                        config_args["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+
                     response = self.client.models.generate_content_stream(
                         model=model,
-                        contents=prompt
+                        contents=prompt,
+                        config=types.GenerateContentConfig(**config_args)
                     )
                     for chunk in response:
                         if chunk.text:
@@ -111,6 +137,6 @@ class StandardizedPatientAgent:
                     return
                 except Exception as e:
                     last_error = str(e)
-                    time.sleep(0.5)
+                    time.sleep(0.3)
                     
         yield f"Error técnico en el servidor: {last_error}"

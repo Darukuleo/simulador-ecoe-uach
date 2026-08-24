@@ -1,9 +1,18 @@
+import sys
 import os
 import json
 import time
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+
+# Integración con AntigravityConfig
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+try:
+    from antigravity_config import AntigravityConfig
+    FALLBACK_PRO = AntigravityConfig.FALLBACK_PRO_MODELS
+except Exception:
+    FALLBACK_PRO = ["gemini-3.1-pro", "gemini-3.7-flash"]
 
 class OSCEEvaluationReport(BaseModel):
     score_anamnesis: float = Field(description="Puntaje de Anamnesis (0 a 20)")
@@ -19,18 +28,25 @@ class OSCEEvaluationReport(BaseModel):
 class OSCEEvaluatorAgent:
     """
     Agente Tutor / Evaluador Docente UACh de Estaciones ECOE/OSCE.
-    OPTIMIZADO PARA RIGOR (Gemini Pro).
+    OPTIMIZADO CON GEMINI 3.1 PRO Y THINKING BUDGET DE EVALUACIÓN CLÍNICA.
     """
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         self._client = None
-        # Usamos PRO (3.1) para maximizar la rigurosidad clínica, o FLASH si hay algún problema
-        self.fallback_models = ["gemini-3.1-pro", "gemini-3.6-flash"]
+        self.fallback_models = FALLBACK_PRO
 
     @property
     def client(self):
         if self._client is None:
             self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY")
+            if not self.api_key:
+                env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
+                if os.path.exists(env_path):
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip().startswith("GEMINI_API_KEY="):
+                                self.api_key = line.strip().split("=", 1)[1].strip('"').strip("'")
+                                break
             if self.api_key:
                 self._client = genai.Client(api_key=self.api_key)
         return self._client
@@ -61,13 +77,18 @@ class OSCEEvaluatorAgent:
         for model in self.fallback_models:
             for attempt in range(2):
                 try:
+                    config_args = {
+                        "response_mime_type": "application/json",
+                        "response_schema": OSCEEvaluationReport,
+                        "temperature": 0.1
+                    }
+                    if "3.7" in model and hasattr(types, "ThinkingConfig"):
+                        config_args["thinking_config"] = types.ThinkingConfig(thinking_budget=4096)
+
                     response = self.client.models.generate_content(
                         model=model,
                         contents=prompt,
-                        config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            response_schema=OSCEEvaluationReport,
-                        )
+                        config=types.GenerateContentConfig(**config_args)
                     )
                     
                     if response.parsed:
@@ -79,7 +100,7 @@ class OSCEEvaluatorAgent:
                     return report.model_dump() if hasattr(report, "model_dump") else report.dict()
                 except Exception as e:
                     last_error = str(e)
-                    time.sleep(0.5)
+                    time.sleep(0.3)
                     
         return {
             "score_anamnesis": 0.0,
