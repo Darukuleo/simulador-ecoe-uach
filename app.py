@@ -696,18 +696,25 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                 st.caption("Por favor responde estas breves preguntas (1 a 5) para guardar oficialmente tus resultados en la plataforma.")
                 
                 with st.form("form_encuesta_investigacion"):
-                    st.markdown("##### 🔹 Dimensión I: Fidelidad Clínica y Realismo")
+                    st.markdown("##### 🔹 Dimensión I: System Usability Scale (SUS) - Validez Internacional")
+                    st.caption("Responde de 1 (Muy en desacuerdo) a 5 (Muy de acuerdo).")
+                    sus1 = st.slider("1. Creo que me gustaría utilizar este simulador con frecuencia.", 1, 5, 3)
+                    sus2 = st.slider("2. Encontré el simulador innecesariamente complejo.", 1, 5, 3)
+                    sus3 = st.slider("3. Pensé que el simulador era fácil de usar.", 1, 5, 3)
+                    sus4 = st.slider("4. Creo que necesitaría apoyo técnico para poder utilizar este simulador.", 1, 5, 3)
+                    sus5 = st.slider("5. Encontré que las funciones de este simulador estaban bien integradas.", 1, 5, 3)
+                    sus6 = st.slider("6. Pensé que había demasiada inconsistencia en el simulador.", 1, 5, 3)
+                    sus7 = st.slider("7. Imagino que la mayoría de mis compañeros aprendería a usarlo rápidamente.", 1, 5, 3)
+                    sus8 = st.slider("8. Encontré el simulador muy engorroso/pesado de usar.", 1, 5, 3)
+                    sus9 = st.slider("9. Me sentí muy seguro(a) y confiado(a) utilizando el sistema.", 1, 5, 3)
+                    sus10 = st.slider("10. Necesité aprender muchas cosas antes de poder empezar a utilizarlo.", 1, 5, 3)
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔹 Dimensión II: Fidelidad Clínica y Realismo")
                     f1 = st.slider("F1: El paciente de IA respondió de forma clínicamente coherente y realista.", 1, 5, 4)
                     f2 = st.slider("F2: El paciente mantuvo el tono emocional (dolor, preocupación, ansiedad) adecuado.", 1, 5, 4)
                     f3 = st.slider("F3: La entrega de hallazgos del examen físico y exámenes fue precisa.", 1, 5, 4)
                     f4 = st.slider("F4: Sentí que estaba interactuando con un paciente real en un box.", 1, 5, 4)
-                    
-                    st.markdown("---")
-                    st.markdown("##### 🔹 Dimensión II: Usabilidad y Experiencia de Usuario")
-                    u1 = st.slider("U1: La interfaz web fue clara, intuitiva y fácil de navegar.", 1, 5, 5)
-                    u2 = st.slider("U2: El tiempo de 7 minutos por estación fue adecuado.", 1, 5, 4)
-                    u3 = st.slider("U3: El reloj cronómetro en pantalla me ayudó a gestionar la consulta.", 1, 5, 4)
-                    u4 = st.slider("U4: No experimenté dificultades técnicas que interfirieran.", 1, 5, 5)
                     
                     st.markdown("---")
                     st.markdown("##### 🔹 Dimensión III: Valor Pedagógico")
@@ -729,12 +736,14 @@ if "🎓 Modo Interno" in role_mode and st.session_state.override_mode != "docen
                     
                     btn_survey = st.form_submit_button("💾 Guardar Encuesta y Ver Mi Certificado de Notas ➔", type="primary")
                     if btn_survey:
-                        likert_dict = {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "U1": u1, "U2": u2, "U3": u3, "U4": u4, "P1": p1, "P2": p2, "P3": p3, "P4": p4, "V1": v1, "V2": v2}
+                        sus_dict = {"SUS1": sus1, "SUS2": sus2, "SUS3": sus3, "SUS4": sus4, "SUS5": sus5, "SUS6": sus6, "SUS7": sus7, "SUS8": sus8, "SUS9": sus9, "SUS10": sus10}
+                        likert_dict = {"F1": f1, "F2": f2, "F3": f3, "F4": f4, "P1": p1, "P2": p2, "P3": p3, "P4": p4, "V1": v1, "V2": v2}
                         qual_dict = {"Q1": q1.strip(), "Q2": q2.strip(), "Q3": q3.strip()}
-                        insert_encuesta_investigacion(st.session_state.circuit_student_name, likert_dict, qual_dict)
+                        insert_encuesta_investigacion(st.session_state.circuit_student_name, sus_dict, likert_dict, qual_dict)
                         
                         append_permanent_log("encuesta", {
                             "alumno": st.session_state.circuit_student_name,
+                            "sus": sus_dict,
                             "likert": likert_dict,
                             "cualitativa": qual_dict
                         })
@@ -910,8 +919,44 @@ else:
                     
                     with st.expander(f"👤 Alumno: {ev_item['alumno_nombre']} | [{ev_item['codigo_estacion']}] {ev_item['titulo']} | NOTA: {nota:.1f} ({pct:.1f}%)"):
                         st.write(f"**Fecha y Hora:** {ev_item['fecha_sesion']}")
-                        st.write(f"**Desglose Puntajes:** Anamnesis {ev_item.get('puntaje_anamnesis', 15)}/20 | Examen Físico {ev_item.get('puntaje_examen_fisico', 15)}/20 | Exámenes {ev_item.get('puntaje_examenes', 15)}/20 | Diagnóstico {ev_item.get('puntaje_diagnostico', 15)}/20 | Conducta {ev_item.get('puntaje_conducta', 15)}/20")
-                        st.info(f"**Feedback Docente:** {ev_item['feedback_docente']}")
+                        
+                        # Mostrar Transcripción (solo el alumno para calibrar)
+                        st.markdown("#### 📜 Transcripción de la Consulta")
+                        chat_log = ""
+                        for msg in ev_item.get("chat_history", []):
+                            if msg['role'] == 'user':
+                                chat_log += f"**👨‍⚕️ Interno:** {msg['content']}\n\n"
+                            else:
+                                chat_log += f"**🤒 Paciente:** {msg['content']}\n\n"
+                        st.text_area("Diálogo Histórico", value=chat_log, height=200, disabled=True, key=f"chat_{ev_item['sesion_id']}")
+                        
+                        # Formulario de Calibración Humana
+                        has_human_eval = ev_item.get("human_puntaje_global") is not None
+                        if has_human_eval:
+                            st.success(f"✅ Evaluación Humana Registrada: {ev_item['human_puntaje_global']}%")
+                            st.info(f"**Feedback Humano:** {ev_item['human_feedback_docente']}")
+                        else:
+                            st.markdown("#### ⚖️ Calibración Docente (Ciega)")
+                            st.caption("Evalúa esta transcripción antes de ver la nota de la IA para un estudio de validación.")
+                            with st.form(f"form_humano_{ev_item['sesion_id']}"):
+                                col_h1, col_h2 = st.columns(2)
+                                h_anamnesis = col_h1.slider("Anamnesis (0-20)", 0, 20, 15)
+                                h_ef = col_h1.slider("Examen Físico (0-20)", 0, 20, 15)
+                                h_exam = col_h1.slider("Exámenes (0-20)", 0, 20, 15)
+                                h_diag = col_h2.slider("Diagnóstico (0-20)", 0, 20, 15)
+                                h_cond = col_h2.slider("Conducta/Manejo (0-20)", 0, 20, 15)
+                                h_fb = st.text_area("Feedback Cualitativo (Opcional)")
+                                
+                                if st.form_submit_button("Guardar Evaluación Humana"):
+                                    h_global = ((h_anamnesis + h_ef + h_exam + h_diag + h_cond) / 100.0) * 100
+                                    from src.database import insert_evaluacion_humana
+                                    insert_evaluacion_humana(ev_item['sesion_id'], h_global, h_anamnesis, h_ef, h_exam, h_diag, h_cond, h_fb)
+                                    st.success("¡Guardado! Recarga la página para actualizar.")
+                                    
+                        # Mostrar la Evaluación de la IA colapsada
+                        with st.expander("🤖 Ver Calificación Original de la Inteligencia Artificial"):
+                            st.write(f"**Desglose IA:** Anamnesis {ev_item.get('puntaje_anamnesis', 0)}/20 | Examen {ev_item.get('puntaje_examen_fisico', 0)}/20 | Exámenes {ev_item.get('puntaje_examenes', 0)}/20 | Diagnóstico {ev_item.get('puntaje_diagnostico', 0)}/20 | Conducta {ev_item.get('puntaje_conducta', 0)}/20")
+                            st.info(f"**Feedback IA:** {ev_item['feedback_docente']}")
             else:
                 st.info("Aún no hay evaluaciones registradas en la base de datos local.")
 

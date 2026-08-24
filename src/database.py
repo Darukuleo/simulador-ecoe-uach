@@ -78,6 +78,21 @@ def insert_evaluacion(sesion_id: str, p_global: float, p_anamnesis: float, p_ef:
         }
     })
 
+def insert_evaluacion_humana(sesion_id: str, p_global: float, p_anamnesis: float, p_ef: float, p_exam: float, p_diag: float, p_conducta: float, feedback: str):
+    if not db: return
+    db.collection('sesiones_simulacion').document(str(sesion_id)).update({
+        'evaluacion_humana': {
+            'puntaje_global': p_global,
+            'puntaje_anamnesis': p_anamnesis,
+            'puntaje_examen_fisico': p_ef,
+            'puntaje_examenes': p_exam,
+            'puntaje_diagnostico': p_diag,
+            'puntaje_conducta': p_conducta,
+            'feedback_docente': feedback,
+            'fecha_evaluacion': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    })
+
 def get_todas_evaluaciones() -> list:
     if not db: return []
     # Traemos todas las sesiones que tengan una evaluación anidada
@@ -88,12 +103,14 @@ def get_todas_evaluaciones() -> list:
         data = doc.to_dict()
         if 'evaluacion' in data:
             ev = data['evaluacion']
+            ev_h = data.get('evaluacion_humana', {})
             row = {
                 'sesion_id': doc.id,
                 'alumno_nombre': data.get('alumno_nombre', ''),
                 'codigo_estacion': data.get('caso_codigo', ''),
                 'titulo': data.get('caso_titulo', ''),
                 'especialidad': data.get('caso_especialidad', ''),
+                'chat_history': data.get('chat_history', []),
                 'puntaje_global': ev.get('puntaje_global', 0),
                 'puntaje_anamnesis': ev.get('puntaje_anamnesis', 0),
                 'puntaje_examen_fisico': ev.get('puntaje_examen_fisico', 0),
@@ -101,6 +118,14 @@ def get_todas_evaluaciones() -> list:
                 'puntaje_diagnostico': ev.get('puntaje_diagnostico', 0),
                 'puntaje_conducta': ev.get('puntaje_conducta', 0),
                 'feedback_docente': ev.get('feedback_docente', ''),
+                # Human evaluation data (can be empty if not yet evaluated)
+                'human_puntaje_global': ev_h.get('puntaje_global', None),
+                'human_puntaje_anamnesis': ev_h.get('puntaje_anamnesis', None),
+                'human_puntaje_examen_fisico': ev_h.get('puntaje_examen_fisico', None),
+                'human_puntaje_examenes': ev_h.get('puntaje_examenes', None),
+                'human_puntaje_diagnostico': ev_h.get('puntaje_diagnostico', None),
+                'human_puntaje_conducta': ev_h.get('puntaje_conducta', None),
+                'human_feedback_docente': ev_h.get('feedback_docente', ''),
                 'fecha_sesion': data.get('fecha_sesion', '')
             }
             rows.append(row)
@@ -137,20 +162,27 @@ def update_config_examen(examen_habilitado, modo_horario, fecha_examen, hora_ini
 
 # --- TABLA Y FUNCIONES DE ENCUESTA ---
 
-def insert_encuesta_investigacion(alumno_nombre: str, likert_dict: dict, cualitativa_dict: dict):
+def insert_encuesta_investigacion(alumno_nombre: str, sus_dict: dict, likert_dict: dict, cualitativa_dict: dict):
     if not db: return
     
-    f_avg = (likert_dict.get("F1", 4) + likert_dict.get("F2", 4) + likert_dict.get("F3", 4) + likert_dict.get("F4", 4)) / 4.0
-    u_avg = (likert_dict.get("U1", 4) + likert_dict.get("U2", 4) + likert_dict.get("U3", 4) + likert_dict.get("U4", 4)) / 4.0
-    p_avg = (likert_dict.get("P1", 4) + likert_dict.get("P2", 4) + likert_dict.get("P3", 4) + likert_dict.get("P4", 4)) / 4.0
-    v_avg = (likert_dict.get("V1", 4) + likert_dict.get("V2", 4)) / 2.0
+    # Cálculo de System Usability Scale (SUS)
+    sus_score = 0
+    if sus_dict:
+        sum_odd = sum([sus_dict.get(f"SUS{i}", 3) - 1 for i in [1, 3, 5, 7, 9]])
+        sum_even = sum([5 - sus_dict.get(f"SUS{i}", 3) for i in [2, 4, 6, 8, 10]])
+        sus_score = (sum_odd + sum_even) * 2.5
+    
+    f_avg = (likert_dict.get("F1", 4) + likert_dict.get("F2", 4) + likert_dict.get("F3", 4) + likert_dict.get("F4", 4)) / 4.0 if "F1" in likert_dict else 0
+    p_avg = (likert_dict.get("P1", 4) + likert_dict.get("P2", 4) + likert_dict.get("P3", 4) + likert_dict.get("P4", 4)) / 4.0 if "P1" in likert_dict else 0
+    v_avg = (likert_dict.get("V1", 4) + likert_dict.get("V2", 4)) / 2.0 if "V1" in likert_dict else 0
     
     db.collection('encuestas_investigacion').add({
         'alumno_nombre': alumno_nombre,
+        'sus_score': sus_score,
         'fidelidad_promedio': f_avg,
-        'usabilidad_promedio': u_avg,
         'pedagogico_promedio': p_avg,
         'voz_promedio': v_avg,
+        'respuestas_sus_json': json.dumps(sus_dict, ensure_ascii=False),
         'respuestas_likert_json': json.dumps(likert_dict, ensure_ascii=False),
         'respuestas_cualitativas_json': json.dumps(cualitativa_dict, ensure_ascii=False),
         'fecha_encuesta': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
